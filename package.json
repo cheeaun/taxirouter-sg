@@ -1,0 +1,31 @@
+{
+  "name": "taxirouter-sg",
+  "version": "0.1.0",
+  "description": "Explore available taxis and taxi stands in Singapore",
+  "keywords": [
+    "taxi",
+    "singapore",
+    "transport"
+  ],
+  "author": "Lim Chee Aun",
+  "license": "MIT",
+  "scripts": {
+    "taxi-stands": "node scripts/fetch-taxi-stands.js",
+    "lodash": "lodash include=forEach exports=global -d -o assets/lodash.js",
+    "serve": "http-server -c-1",
+    "inliner": "node scripts/inliner.js _index.html index.html",
+    "watch": "chokidar '_index.html' 'assets/*.js' 'assets/*.css' 'data/all.json' -c 'npm run inliner'",
+    "start": "parallelshell 'npm run watch' 'npm run serve'",
+    "deploy": "git checkout gh-pages && git merge master && git push origin gh-pages && git checkout master"
+  },
+  "devDependencies": {
+    "cheerio": "~0.20.0",
+    "chokidar-cli": "~1.2.0",
+    "clean-css": "~3.4.10",
+    "http-server": "~0.9.0",
+    "json5": "~0.5.0",
+    "lodash-cli": "~4.6.1",
+    "parallelshell": "~2.0.0",
+    "uglify-js": "~2.6.2"
+  }
+}
