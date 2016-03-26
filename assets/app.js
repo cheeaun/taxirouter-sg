@@ -270,7 +270,7 @@ function initMap(){
 
           if (!watching) map.panTo(currentLocation);
           watching = true;
-          sessionStorage['railrouter-sg:watch-location'] = 1;
+          sessionStorage['taxirouter-sg:watch-location'] = 1;
 
           // Make sure current location is in Singapore first
           var bounds = new google.maps.LatLngBounds(
@@ -295,7 +295,7 @@ function initMap(){
     }, false);
 
     // Always show current location
-    if (sessionStorage['railrouter-sg:watch-location']) setTimeout(function(){
+    if (sessionStorage['taxirouter-sg:watch-location']) setTimeout(function(){
       $location.click();
     }, 1000);
 
