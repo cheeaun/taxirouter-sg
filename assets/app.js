@@ -196,7 +196,7 @@ function initMap(){
   });
   $('back-sg').addEventListener('click', function(){
     $boundsWarning.classList.remove('visible');
-		map.fitBounds(mapBounds);
+    map.fitBounds(mapBounds);
   }, false);
 
   renderTaxiStands();
