@@ -105,6 +105,7 @@ function renderTaxis(){
       if (taxisOnMap[key]){
         // For some reason, there are multiple taxis located on the SAME POSITION
         // So here, we just draw one taxi per lat,lng (unique key)
+        // console.log('MULTI TAXI', key);
         return;
       }
       q.defer(function(done){
