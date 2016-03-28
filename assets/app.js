@@ -69,8 +69,7 @@ function renderTaxis(){
       var q = d3_queue.queue(50);
       _.forEach(taxisOnMapKeys, function(key){
         if (taxiKeys.indexOf(key) < 0){
-          removed.push(taxisOnMap[key]);
-          delete taxisOnMap[key];
+          removed.push(key);
         } else {
           q.defer(function(done){
             taxisOnMap[key].setOpacity(.5);
@@ -87,9 +86,9 @@ function renderTaxis(){
 
     // 2. Get rid of excess removed markers
     if (removed.length > added.length){
-      _.forEach(removed.splice(added.length), function(m){
-        m.setMap(null);
-        m = null;
+      _.forEach(removed.splice(added.length), function(key){
+        taxisOnMap[key].setMap(null);
+        delete taxisOnMap[key];
       });
     }
 
@@ -111,12 +110,14 @@ function renderTaxis(){
       q.defer(function(done){
         var coord = key.split(',');
         var position = new google.maps.LatLng(coord[0], coord[1]);
-        var m = removed[i];
-        if (m){
+        var removedKey = removed[i];
+        if (removedKey){
+          var m = taxisOnMap[removedKey];
           m.setPosition(position);
           m.setVisible(markersVisible);
           m.setOpacity(1);
           taxisOnMap[key] = m;
+          delete taxisOnMap[removedKey];
           done();
         } else {
           taxisOnMap[key] = new google.maps.Marker({
