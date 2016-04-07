@@ -49,14 +49,16 @@ function renderTaxiStands(){
 
 function renderTaxis(){
   $infoTaxis.className = 'loading';
-  fetch('https://data.gov.sg/realtime-api/transport/taxiAvailability')
+  fetch('https://api.data.gov.sg/v1/transport/taxi-availability', {
+    headers: { 'api-key': 'QSlWniO8ADQu2BmiVAEueFIxHF4GcaQ9' }
+  })
   .then(function(response){
     return response.json();
   })
   .then(function(response){
     $infoTaxis.className = '';
-    if (!response || !response.geoJson || !response.geoJson.features) throw Error(response);
-    var taxiKeys = response.geoJson.features[0].coordinates.map(function(c){
+    if (!response || !response.features) throw Error(response);
+    var taxiKeys = response.features[0].geometry.coordinates.map(function(c){
       return '' + c[1] + ',' + c[0]; // lat,lng
     });
 
