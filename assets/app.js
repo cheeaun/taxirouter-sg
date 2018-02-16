@@ -192,6 +192,7 @@ function initMap(){
   var $boundsWarning = $('bounds-warning');
   map.addListener('bounds_changed', function(){
     var bounds = map.getBounds();
+    if (!bounds) return;
     if (bounds.intersects(mapBounds)){
       $boundsWarning.classList.remove('visible');
     } else {
