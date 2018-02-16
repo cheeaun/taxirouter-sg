@@ -187,6 +187,12 @@ function initMap(){
     disableDefaultUI: true,
     keyboardShortcuts: true,
     maxZoom: 16,
+    styles: [
+      {
+        featureType: 'poi.business',
+        stylers: [{visibility: 'off'}]
+      },
+    ]
   });
   map.fitBounds(mapBounds);
   var $boundsWarning = $('bounds-warning');
