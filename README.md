@@ -17,7 +17,7 @@ That's it.
 Story
 ---
 
-This project is [first inspired](https://twitter.com/cheeaun/status/710632610607726592) by [@uzyn](https://github.com/uzyn)'s project: [Singapore Taxi Data Visualization](http://uzyn.github.io/taxisg/). Also following up from his talk on FOSS Asia 2016: [Uncovering of an obfuscated public governmental API ](https://speakerdeck.com/uzyn/uncovering-of-an-obfuscated-public-governmental-api-foss-asia-2016). Later, [Data.gov.sg](https://data.gov.sg/) releases a new [taxi availability API](https://developers.data.gov.sg/datagovsg-apis/apis/get/transport/taxi-availability) and that marks the beginning of this project.
+This project is [first inspired](https://twitter.com/cheeaun/status/710632610607726592) by [@uzyn](https://github.com/uzyn)'s project: [Singapore Taxi Data Visualization](http://uzyn.github.io/taxisg/). Also following up from his talk on FOSS Asia 2016: [Uncovering of an obfuscated public governmental API ](https://speakerdeck.com/uzyn/uncovering-of-an-obfuscated-public-governmental-api-foss-asia-2016). Later, [Data.gov.sg](https://data.gov.sg/) releases a new [taxi availability API](https://developers.data.gov.sg/transport/taxi-availability) and that marks the beginning of this project.
 
 Technicalities
 ---
