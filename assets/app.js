@@ -95,7 +95,7 @@ function renderTaxis(){
     }
 
     // 3. Plot the added markers
-    markersVisible = map.getZoom() >= 14;
+    markersVisible = map.getZoom() >= 13;
     var icon = {
       url: 'assets/taxi.png',
       size: new google.maps.Size(18, 16),
@@ -208,7 +208,7 @@ function initMap(){
   renderTaxis();
 
   map.addListener('zoom_changed', function(){
-    var visible = map.getZoom() >= 14;
+    var visible = map.getZoom() >= 13;
     if (markersVisible != visible){
       _.forEach(taxisOnMap, function(t){
         t.setVisible(visible);
