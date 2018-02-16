@@ -13,7 +13,7 @@
   var undefined;
 
   /** Used as the semantic version number. */
-  var VERSION = '4.17.4';
+  var VERSION = '4.17.5';
 
   /** Used as the size to enable large array optimizations. */
   var LARGE_ARRAY_SIZE = 200;
@@ -77,7 +77,6 @@
   /** Used to match property names within property paths. */
   var reIsDeepProp = /\.|\[(?:[^[\]]*|(["'])(?:(?!\1)[^\\]|\\.)*?\1)\]/,
       reIsPlainProp = /^\w*$/,
-      reLeadingDot = /^\./,
       rePropName = /[^.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|$))/g;
 
   /**
@@ -159,37 +158,11 @@
   }());
 
   /* Node.js helper references. */
-  var nodeIsTypedArray = nodeUtil && nodeUtil.isTypedArray;
+  var nodeIsMap = nodeUtil && nodeUtil.isMap,
+      nodeIsSet = nodeUtil && nodeUtil.isSet,
+      nodeIsTypedArray = nodeUtil && nodeUtil.isTypedArray;
 
   /*--------------------------------------------------------------------------*/
-
-  /**
-   * Adds the key-value `pair` to `map`.
-   *
-   * @private
-   * @param {Object} map The map to modify.
-   * @param {Array} pair The key-value pair to add.
-   * @returns {Object} Returns `map`.
-   */
-  function addMapEntry(map, pair) {
-    // Don't return `map.set` because it's not chainable in IE 11.
-    map.set(pair[0], pair[1]);
-    return map;
-  }
-
-  /**
-   * Adds `value` to `set`.
-   *
-   * @private
-   * @param {Object} set The set to modify.
-   * @param {*} value The value to add.
-   * @returns {Object} Returns `set`.
-   */
-  function addSetEntry(set, value) {
-    // Don't return `set.add` because it's not chainable in IE 11.
-    set.add(value);
-    return set;
-  }
 
   /**
    * A specialized version of `_.forEach` for arrays without support for
@@ -273,31 +246,6 @@
       array[offset + index] = values[index];
     }
     return array;
-  }
-
-  /**
-   * A specialized version of `_.reduce` for arrays without support for
-   * iteratee shorthands.
-   *
-   * @private
-   * @param {Array} [array] The array to iterate over.
-   * @param {Function} iteratee The function invoked per iteration.
-   * @param {*} [accumulator] The initial value.
-   * @param {boolean} [initAccum] Specify using the first element of `array` as
-   *  the initial value.
-   * @returns {*} Returns the accumulated value.
-   */
-  function arrayReduce(array, iteratee, accumulator, initAccum) {
-    var index = -1,
-        length = array == null ? 0 : array.length;
-
-    if (initAccum && length) {
-      accumulator = array[++index];
-    }
-    while (++index < length) {
-      accumulator = iteratee(accumulator, array[index], index, array);
-    }
-    return accumulator;
   }
 
   /**
@@ -1322,7 +1270,7 @@
         if (!cloneableTags[tag]) {
           return object ? value : {};
         }
-        result = initCloneByTag(value, tag, baseClone, isDeep);
+        result = initCloneByTag(value, tag, isDeep);
       }
     }
     // Check for circular references and return its corresponding clone.
@@ -1332,6 +1280,22 @@
       return stacked;
     }
     stack.set(value, result);
+
+    if (isSet(value)) {
+      value.forEach(function(subValue) {
+        result.add(baseClone(subValue, bitmask, customizer, subValue, value, stack));
+      });
+
+      return result;
+    }
+
+    if (isMap(value)) {
+      value.forEach(function(subValue, key) {
+        result.set(key, baseClone(subValue, bitmask, customizer, key, value, stack));
+      });
+
+      return result;
+    }
 
     var keysFunc = isFull
       ? (isFlat ? getAllKeysIn : getAllKeys)
@@ -1543,6 +1507,17 @@
   }
 
   /**
+   * The base implementation of `_.isMap` without Node.js optimizations.
+   *
+   * @private
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is a map, else `false`.
+   */
+  function baseIsMap(value) {
+    return isObjectLike(value) && getTag(value) == mapTag;
+  }
+
+  /**
    * The base implementation of `_.isMatch` without support for iteratee shorthands.
    *
    * @private
@@ -1610,6 +1585,17 @@
     }
     var pattern = isFunction(value) ? reIsNative : reIsHostCtor;
     return pattern.test(toSource(value));
+  }
+
+  /**
+   * The base implementation of `_.isSet` without Node.js optimizations.
+   *
+   * @private
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is a set, else `false`.
+   */
+  function baseIsSet(value) {
+    return isObjectLike(value) && getTag(value) == setTag;
   }
 
   /**
@@ -1825,20 +1811,6 @@
   }
 
   /**
-   * Creates a clone of `map`.
-   *
-   * @private
-   * @param {Object} map The map to clone.
-   * @param {Function} cloneFunc The function to clone values.
-   * @param {boolean} [isDeep] Specify a deep clone.
-   * @returns {Object} Returns the cloned map.
-   */
-  function cloneMap(map, isDeep, cloneFunc) {
-    var array = isDeep ? cloneFunc(mapToArray(map), CLONE_DEEP_FLAG) : mapToArray(map);
-    return arrayReduce(array, addMapEntry, new map.constructor);
-  }
-
-  /**
    * Creates a clone of `regexp`.
    *
    * @private
@@ -1849,20 +1821,6 @@
     var result = new regexp.constructor(regexp.source, reFlags.exec(regexp));
     result.lastIndex = regexp.lastIndex;
     return result;
-  }
-
-  /**
-   * Creates a clone of `set`.
-   *
-   * @private
-   * @param {Object} set The set to clone.
-   * @param {Function} cloneFunc The function to clone values.
-   * @param {boolean} [isDeep] Specify a deep clone.
-   * @returns {Object} Returns the cloned set.
-   */
-  function cloneSet(set, isDeep, cloneFunc) {
-    var array = isDeep ? cloneFunc(setToArray(set), CLONE_DEEP_FLAG) : setToArray(set);
-    return arrayReduce(array, addSetEntry, new set.constructor);
   }
 
   /**
@@ -2475,7 +2433,7 @@
    */
   function initCloneArray(array) {
     var length = array.length,
-        result = array.constructor(length);
+        result = new array.constructor(length);
 
     // Add properties assigned by `RegExp#exec`.
     if (length && typeof array[0] == 'string' && hasOwnProperty.call(array, 'index')) {
@@ -2502,16 +2460,15 @@
    * Initializes an object clone based on its `toStringTag`.
    *
    * **Note:** This function only supports cloning values with tags of
-   * `Boolean`, `Date`, `Error`, `Number`, `RegExp`, or `String`.
+   * `Boolean`, `Date`, `Error`, `Map`, `Number`, `RegExp`, `Set`, or `String`.
    *
    * @private
    * @param {Object} object The object to clone.
    * @param {string} tag The `toStringTag` of the object to clone.
-   * @param {Function} cloneFunc The function to clone values.
    * @param {boolean} [isDeep] Specify a deep clone.
    * @returns {Object} Returns the initialized clone.
    */
-  function initCloneByTag(object, tag, cloneFunc, isDeep) {
+  function initCloneByTag(object, tag, isDeep) {
     var Ctor = object.constructor;
     switch (tag) {
       case arrayBufferTag:
@@ -2530,7 +2487,7 @@
         return cloneTypedArray(object, isDeep);
 
       case mapTag:
-        return cloneMap(object, isDeep, cloneFunc);
+        return new Ctor;
 
       case numberTag:
       case stringTag:
@@ -2540,7 +2497,7 @@
         return cloneRegExp(object);
 
       case setTag:
-        return cloneSet(object, isDeep, cloneFunc);
+        return new Ctor;
 
       case symbolTag:
         return cloneSymbol(object);
@@ -2556,10 +2513,13 @@
    * @returns {boolean} Returns `true` if `value` is a valid index, else `false`.
    */
   function isIndex(value, length) {
+    var type = typeof value;
     length = length == null ? MAX_SAFE_INTEGER : length;
+
     return !!length &&
-      (typeof value == 'number' || reIsUint.test(value)) &&
-      (value > -1 && value % 1 == 0 && value < length);
+      (type == 'number' ||
+        (type != 'symbol' && reIsUint.test(value))) &&
+          (value > -1 && value % 1 == 0 && value < length);
   }
 
   /**
@@ -2712,11 +2672,11 @@
    */
   var stringToPath = memoizeCapped(function(string) {
     var result = [];
-    if (reLeadingDot.test(string)) {
+    if (string.charCodeAt(0) === 46 /* . */) {
       result.push('');
     }
-    string.replace(rePropName, function(match, number, quote, string) {
-      result.push(quote ? string.replace(reEscapeChar, '$1') : (number || match));
+    string.replace(rePropName, function(match, number, quote, subString) {
+      result.push(quote ? subString.replace(reEscapeChar, '$1') : (number || match));
     });
     return result;
   });
@@ -3112,6 +3072,44 @@
   }
 
   /**
+   * Checks if `value` is classified as a `Map` object.
+   *
+   * @static
+   * @memberOf _
+   * @since 4.3.0
+   * @category Lang
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is a map, else `false`.
+   * @example
+   *
+   * _.isMap(new Map);
+   * // => true
+   *
+   * _.isMap(new WeakMap);
+   * // => false
+   */
+  var isMap = nodeIsMap ? baseUnary(nodeIsMap) : baseIsMap;
+
+  /**
+   * Checks if `value` is classified as a `Set` object.
+   *
+   * @static
+   * @memberOf _
+   * @since 4.3.0
+   * @category Lang
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is a set, else `false`.
+   * @example
+   *
+   * _.isSet(new Set);
+   * // => true
+   *
+   * _.isSet(new WeakSet);
+   * // => false
+   */
+  var isSet = nodeIsSet ? baseUnary(nodeIsSet) : baseIsSet;
+
+  /**
    * Checks if `value` is classified as a `Symbol` primitive or object.
    *
    * @static
@@ -3454,8 +3452,10 @@
   lodash.isBuffer = isBuffer;
   lodash.isFunction = isFunction;
   lodash.isLength = isLength;
+  lodash.isMap = isMap;
   lodash.isObject = isObject;
   lodash.isObjectLike = isObjectLike;
+  lodash.isSet = isSet;
   lodash.isSymbol = isSymbol;
   lodash.isTypedArray = isTypedArray;
   lodash.stubArray = stubArray;
