@@ -2,11 +2,11 @@ html, body {
   height: 100%;
   margin: 0;
   padding: 0;
-  background-color: #B3D1FF;
+  background-color: #0C0D0E;
 }
 
 body, input, button {
-  font-family: Roboto, sans-serif;
+  font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif;
 }
 
 a{
@@ -29,6 +29,7 @@ button{
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
+  background-color: #fff;
 }
 button:active{
   color: #fff;
@@ -75,20 +76,21 @@ header svg {
   width: 100%;
   max-height: 100%;
   overflow: auto;
-  z-index: 2;
-  padding: 5px 10px 5px;
+  z-index: 3;
+  padding: 15px;
   -webkit-transition: -webkit-transform .3s cubic-bezier(0.150, 0.780, 0.180, 1.170);
   transition: transform .3s cubic-bezier(0.150, 0.780, 0.180, 1.170);
   -webkit-transform: translate3d(0, -100%, 0);
   transform: translate3d(0, -100%, 0);
   pointer-events: none;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 #about.show {
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
   pointer-events: auto;
-  box-shadow: 0 1px 15px rgba(0,0,0,.3);
 }
 
 @media screen and (min-width: 500px) and (min-height: 500px) {
@@ -96,25 +98,24 @@ header svg {
     width: 500px;
     left: 50%;
     margin-left: -250px;
-    border-radius: 5px;
+    border-radius: 12px;
   }
   #about.show {
-    transform: translate3d(0, 10px, 0);
-    -webkit-transform: translate3d(0, 10px, 0);
+    transform: translate3d(0, 15px, 0);
+    -webkit-transform: translate3d(0, 15px, 0);
   }
 }
 
-#about h2{
-  color: #111;
+#about h2,
+#about h3{
   margin: 0;
-  padding: 5px 0;
-  font-size: 1.3em;
-  font-weight: 100;
+  padding: 0 0 .5em;
 }
 
 #about p {
   margin: 0;
-  padding: 0 0 5px;
+  padding: 0 0 .5em;
+  line-height: 1.4;
 }
 
 #about ul{
@@ -133,7 +134,7 @@ header svg {
 
 #about button {
   width: 100%;
-  margin: 5px 0;
+  margin: 0;
 }
 
 #preview{
@@ -144,30 +145,34 @@ header svg {
 }
 
 #map{
-  height: 100%;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 100%;
 }
 
 #info-taxis{
-  font-size: .8em;
-  font-weight: 300;
+  pointer-events: none;
+  font-size: .85em;
   position: absolute;
-  bottom: 24px;
+  bottom: 20px;
   right: 68px;
   margin-left: 10px;
-  border-radius: 5px;
+  border-radius: 12px;
   padding: 10px;
   text-align: right;
-  background-color: rgba(255,255,255,.9);
+  color: rgba(255,255,255,.8);
+  background-color: rgba(0,0,0,.5);
+  -webkit-backdrop-filter: blur(10px) saturate(50%);
+  backdrop-filter: blur(10px) saturate(50%);
   -webkit-transition: opacity .3s;
   transition: opacity .3s;
-}
-#info-taxis b{
-  font-weight: 500;
-}
-
-#info-taxis.loading{
   -webkit-animation: blink .75s linear infinite alternate;
   animation: blink .75s linear infinite alternate;
+}
+#info-taxis.loaded{
+  -webkit-animation: jump .3s;
+  animation: jump .3s;
 }
 
 @-webkit-keyframes blink{
@@ -179,6 +184,21 @@ header svg {
   0% { opacity: 1 }
   50% { opacity: .2 }
   100% { opacity: 1 }
+}
+
+@-webkit-keyframes jump{
+  0% { transform: translateY(0) }
+  25% { transform: translateY(-10px) }
+  50% { transform: translateY(0) }
+  75% { transform: translateY(-3px) }
+  100% { transform: translateY(0) }
+}
+@keyframes jump{
+  0% { transform: translateY(0) }
+  25% { transform: translateY(-10px) }
+  50% { transform: translateY(0) }
+  75% { transform: translateY(-3px) }
+  100% { transform: translateY(0) }
 }
 
 #location{
@@ -198,43 +218,28 @@ header svg {
   overflow: hidden;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   vertical-align: top;
+  transition: transform .3s ease;
 }
-
 #location svg{
   fill: #666;
 }
-
-#location.active svg{
-  fill: #4285f4;
-}
-
-#location-marker{
-  -webkit-transition: border-width .3s;
-  transition: border-width .3s;
-  box-sizing: content-box;
-  -webkit-transform: translate3d(-50%, -50%, 0);
-  transform: translate3d(-50%, -50%, 0);
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background-color: #4285f4;
-  box-shadow: inset 0 0 0 2px #fff;
-  border: 10px solid rgba(66, 133, 244, .2);
-  background-clip: content-box;
+#location.locating{
   pointer-events: none;
 }
-
-#location-marker.compass:after{
-  content: '';
-  display: inline-block;
-  border-left: 4px solid transparent;
-  border-bottom: 6px solid #4285f4;
-  border-right: 4px solid transparent;
-  width: 0;
-  height: 0;
-  position: absolute;
-  left: 4px;
-  top: -6px;
+#location.locating svg{
+  -webkit-animation: rotate 5s infinite both linear;
+  animation: rotate 5s infinite both linear;
+}
+@-webkit-keyframes rotate{
+  0% { transform: rotate(0) }
+  100% { transform: rotate(1turn) }
+}
+@keyframes rotate{
+  0% { transform: rotate(0) }
+  100% { transform: rotate(1turn) }
+}
+#location.active svg{
+  fill: #4285f4;
 }
 
 #bounds-warning{
@@ -244,8 +249,8 @@ header svg {
   display: none;
   padding: 10px;
   background-color: rgba(0,0,0,.7);
-  -webkit-backdrop-filter: blur(1px);
-  backdrop-filter: blur(1px);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
   color: #fff;
 }
 
@@ -259,4 +264,8 @@ header svg {
 
 #bounds-warning.visible{
   display: block;
+}
+
+.mapboxgl-ctrl-attrib{
+  margin-top: 10px !important;
 }

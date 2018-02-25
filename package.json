@@ -1,6 +1,6 @@
 {
   "name": "taxirouter-sg",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "description": "Explore available taxis and taxi stands in Singapore",
   "keywords": [
     "taxi",
@@ -12,9 +12,9 @@
   "scripts": {
     "taxi-stands": "node scripts/fetch-taxi-stands.js",
     "lodash": "lodash include=forEach exports=global -d -o assets/lodash.js",
-    "serve": "http-server -c-1",
+    "serve": "serve",
     "inliner": "node scripts/inliner.js _index.html index.html",
-    "watch": "chokidar '_index.html' 'assets/*.js' 'assets/*.css' 'data/all.json' -c 'npm run inliner'",
+    "watch": "chokidar '_index.html' 'assets/*.js' 'assets/*.css' 'data/*.json' -c 'npm run inliner'",
     "start": "parallelshell 'npm run watch' 'npm run serve'",
     "deploy": "git checkout gh-pages && git merge master && git push origin gh-pages && git checkout master"
   },
@@ -22,10 +22,8 @@
     "cheerio": "~1.0.0-rc.2",
     "chokidar-cli": "~1.2.0",
     "clean-css": "~4.1.9",
-    "http-server": "~0.11.1",
-    "json5": "~0.5.1",
-    "lodash-cli": "~4.17.5",
     "parallelshell": "~3.0.2",
-    "uglify-js": "~3.3.11"
+    "serve": "~6.5.0",
+    "uglify-js": "~3.3.12"
   }
 }

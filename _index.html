@@ -2,7 +2,6 @@
 <title>TaxiRouter SG - live available taxi locations in Singapore</title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<script>if (/cheeaun\.github/i.test(location.hostname)) location = 'https://taxirouter.sg/';</script>
 <meta name="description" content="Explore available taxis and taxi stands in Singapore">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="TaxiRouter SG">
@@ -14,9 +13,10 @@
 <meta name="twitter:description" property="og:description" content="Explore available taxis and taxi stands in Singapore">
 <meta name="twitter:image" property="og:image" content="https://taxirouter.sg/assets/preview.png">
 <!-- end metacrap -->
+<link rel="stylesheet" href="https://api.tiles.mapbox.com/mapbox-gl-js/v0.44.1/mapbox-gl.css">
 <link rel="stylesheet" href="assets/app.css">
 <link rel="canonical" href="https://taxirouter.sg">
-<link rel="dns-prefetch" href="https://data.gov.sg">
+<link rel="dns-prefetch" href="https://api.data.gov.sg">
 <header id="heading">
   <h1>
     <svg viewBox="0 0 48 48" width="48" height="48">
@@ -29,18 +29,18 @@
   </h1>
 </header>
 <div id="about">
-  <img id="preview" src="assets/preview.png" width="160" height="160" alt="">
+  <img id="preview" src="assets/preview.jpg" width="160" height="160" alt="">
   <h2>TaxiRouter SG</h2>
-  <p><strong>Explore</strong> available taxis and taxi stands in Singapore. Observe <strong>live</strong> available taxi locations. <b>Zoom in</b> to see how many available taxis are around you and how far is the nearest taxi stand.</p>
+  <p><strong>Explore</strong> available taxis and taxi stands in Singapore. <b>Zoom in</b> to see nearby available taxis, taxi stands and traffic information around you.</p>
   <p><a href="https://github.com/cheeaun/taxirouter-sg" target="_blank">Yet another project</a> by <a href="https://twitter.com/cheeaun" target="_blank">@cheeaun</a>. <a href="http://cheeaun.com/blog/2016/03/building-taxirouter-sg/" target="_blank">Read the story on how this is built</a>. Data is copyrighted by the <a href="http://www.lta.gov.sg/" target="_blank">Land Transport Authority</a>.</p>
   <p>Sister sites: <a href="https://busrouter.sg/" target="_blank">🚍 BusRouter SG</a> <a href="https://railrouter.sg/" target="_blank">🚆 RailRouter SG</a></p>
-  <h2>Legend</h2>
+  <h3>Legend</h3>
   <ul>
     <li><img src="assets/taxi-stand.png" width="15" height="23" alt=""> Taxi stand</li>
     <li><img src="assets/taxi.png" width="9" height="8" alt=""> Taxi</li>
-    <li><img src="assets/taxi.png" width="9" height="8" alt="" style="opacity: .5"> Stationary taxi</li>
+    <li><img src="assets/taxi-stationary.png" width="9" height="8" alt=""> Stationary taxi</li>
   </ul>
-  <p><small>Note: 'Stationary taxi' is a taxi that hasn't moved from the its location for one minute.</small></p>
+  <p><small>Note: 'Stationary taxi' is a taxi that hasn't moved from its location for one minute.</small></p>
   <p><button id="about-okay" ontouchstart>Okay</button></p>
 </div>
 <div id="map"></div>
@@ -52,13 +52,9 @@
 <div id="info-taxis">Loading&hellip;</div>
 <div id="bounds-warning">Looks like you're lost.<br><button id="back-sg">Go back to Singapore</button>.</div>
 <inline-json src="data/taxi-stands.json" variable="taxiStandsOnMap"></inline-json>
-<script src="assets/fetch.js"></script>
-<script src="assets/lodash.js"></script>
-<script src="assets/d3_queue.js"></script>
-<script src="assets/locationmarker.js"></script>
+<script src="https://api.tiles.mapbox.com/mapbox-gl-js/v0.44.1/mapbox-gl.js"></script>
+<script src="https://unpkg.com/@turf/turf@5.1.6/turf.min.js"></script>
 <script src="assets/app.js"></script>
-<script async defer
-src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDpk0BS7iLdbn5U545tiIN12k1OCgj2cc4&libraries=geometry&callback=initMap&v=3.exp"></script>
 <script>
 (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
 (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),

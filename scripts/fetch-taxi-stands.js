@@ -12,11 +12,11 @@ https.get('https://s3-ap-southeast-1.amazonaws.com/taxi-taxi/prod/share/taxi_sta
     body.split(/[\n\r]/).forEach((line) => {
       if (!line) return;
       let d = line.split(',');
-      data.push([parseFloat(d[2], 10), parseFloat(d[1], 10)]);
+      data.push([parseFloat(d[1], 10), parseFloat(d[2], 10)]);
     });
     console.log('Taxi stands count: ' + data.length);
 
-    const dataFilePath = 'taxi-stands.json';
+    const dataFilePath = 'data/taxi-stands.json';
     fs.writeFile(dataFilePath, JSON.stringify(data), (e) => {
       if (e) throw e;
       console.log(dataFilePath + ' generated.');

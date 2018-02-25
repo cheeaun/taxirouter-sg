@@ -1,7 +1,7 @@
 TaxiRouter SG
 ===
 
-![](screenshots/screenshot-1.png)
+![](screenshots/screenshot-2.jpg)
 
 **TaxiRouter SG** is a web app that lets you explore available taxis and taxi stands in Singapore. Period.
 

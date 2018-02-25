@@ -1,18 +1,23 @@
-var $ = function(id){ return document.getElementById(id); };
-var $map = $('map');
-var $infoTaxis = $('info-taxis');
+function $(id){ return document.getElementById(id); };
 
-var map;
-var taxisOnMap = {};
-var markersVisible = false;
-var currentLocation;
-var mapBounds = {
-  south: 1.2513146,
-  west: 103.67828510000004,
-  north: 1.4490928,
-  east: 103.99178865,
-};
+// https://gist.github.com/nmsdvid/8807205
+function debounce(a,b,c){var d;return function(){var e=this,f=arguments;clearTimeout(d),d=setTimeout(function(){d=null,c||a.apply(e,f)},b),c&&!d&&a.apply(e,f)}}
+
+// https://stackoverflow.com/a/2901298/20838
+function numberWithCommas(x){ return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
+var $infoTaxis = $('info-taxis');
+var $location = $('location');
 var fiveMinDistance = 80 * 5; // meters, via https://en.wikipedia.org/wiki/Walking_distance_measure
+var emptyGeojson = {
+  type: 'geojson',
+  data: {
+    type: 'Feature',
+  },
+};
+var taxisOnMap;
+var fiveMinCircle;
+var currentLocation;
 
 var $about = $('about');
 var $aboutOkay = $('about-okay');
@@ -23,304 +28,534 @@ var toggleAbout = function(){
 };
 $header.addEventListener('click', toggleAbout, false);
 $aboutOkay.addEventListener('click', toggleAbout, false);
-if (window.localStorage && !localStorage['taxirouter-sg:about']){
+if (window.localStorage && !localStorage.getItem('taxirouter-sg:about')){
   $about.classList.add('show');
-  localStorage['taxirouter-sg:about'] = 1;
+  localStorage.setItem('taxirouter-sg:about', 1);
 }
 
-function renderTaxiStands(){
-  var icon = {
-    url: 'assets/taxi-stand.png',
-    size: new google.maps.Size(30, 46),
-    scaledSize: new google.maps.Size(15, 23),
-    anchor: new google.maps.Point(7.5, 23),
+function fetchTaxis(fn){
+  var xhr = new XMLHttpRequest();
+  xhr.onload = function(){
+    fn(JSON.parse(this.responseText));
   };
-  _.forEach(taxiStandsOnMap, function(stand){
-    var lat = stand[0], lng = stand[1];
-    new google.maps.Marker({
-      position: new google.maps.LatLng(lat, lng),
-      icon: icon,
-      map: map,
-      clickable: false,
-      zIndex: (90-lat)*100,
-    });
-  });
+  xhr.open('GET', 'https://api.data.gov.sg/v1/transport/taxi-availability');
+  xhr.setRequestHeader('api-key', 'QSlWniO8ADQu2BmiVAEueFIxHF4GcaQ9');
+  xhr.send();
 };
 
-function renderTaxis(){
-  $infoTaxis.className = 'loading';
-  fetch('https://api.data.gov.sg/v1/transport/taxi-availability', {
-    headers: { 'api-key': 'QSlWniO8ADQu2BmiVAEueFIxHF4GcaQ9' }
-  })
-  .then(function(response){
-    return response.json();
-  })
-  .then(function(response){
-    $infoTaxis.className = '';
-    if (!response || !response.features) throw Error(response);
-    var taxiKeys = response.features[0].geometry.coordinates.map(function(c){
-      return '' + c[1] + ',' + c[0]; // lat,lng
-    });
+mapboxgl.accessToken = 'pk.eyJ1IjoiY2hlZWF1biIsImEiOiIwMTkyNjRiOWUzOTMyZThkYTE3YjMyMWFiZGU2OTZlNiJ9.XsOEKtyctGiNGNsmVhetYg';
+var map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/navigation-preview-night-v2',
+  logoPosition: 'top-right',
+  attributionControl: false,
+  boxZoom: false,
+});
+map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'top-right');
+map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-    // 1. Diff with taxis on map, get added and removed
-    var added = [], removed = [];
-    var taxisOnMapKeys = Object.keys(taxisOnMap);
-    if (!taxisOnMap || !taxisOnMapKeys.length){
-      added = taxiKeys;
-    } else {
-      var q = d3_queue.queue(50);
-      _.forEach(taxisOnMapKeys, function(key){
-        if (taxiKeys.indexOf(key) < 0){
-          removed.push(key);
-        } else {
-          q.defer(function(done){
-            taxisOnMap[key].setOpacity(.5);
-            setTimeout(done, 1);
-          });
-        }
-      });
-      _.forEach(taxiKeys, function(key){
-        if (!taxisOnMap[key]){
-          added.push(key);
-        }
-      });
+var maxBoundsLike = [
+  [ 103.6016626883025, 1.233357600011331 ], // sw
+  [ 104.0381760444838, 1.473818072475055 ] // ne
+];
+var maxBounds = mapboxgl.LngLatBounds.convert(maxBoundsLike);
+map.fitBounds(maxBounds, { animate: false });
+
+map.on('load', function(){
+  var layers = map.getStyle().layers;
+  // Find the index of the first symbol layer in the map style
+  var labelLayerId;
+  for (var i=0; i<layers.length; i++){
+    if (layers[i].type === 'symbol' && layers[i].layout['text-field']){
+      labelLayerId = layers[i].id;
+      break;
     }
-
-    // 2. Get rid of excess removed markers
-    if (removed.length > added.length){
-      _.forEach(removed.splice(added.length), function(key){
-        taxisOnMap[key].setMap(null);
-        delete taxisOnMap[key];
-      });
-    }
-
-    // 3. Plot the added markers
-    markersVisible = map.getZoom() >= 13;
-    var icon = {
-      url: 'assets/taxi.png',
-      size: new google.maps.Size(18, 16),
-      scaledSize: new google.maps.Size(9, 8),
-      anchor: new google.maps.Point(4.5, 4),
-    };
-    var q = d3_queue.queue(50);
-    _.forEach(added, function(key, i){
-      if (taxisOnMap[key]){
-        // For some reason, there are multiple taxis located on the SAME POSITION
-        // So here, we just draw one taxi per lat,lng (unique key)
-        // console.log('MULTI TAXI', key);
-        return;
-      }
-      q.defer(function(done){
-        var coord = key.split(',');
-        var position = new google.maps.LatLng(coord[0], coord[1]);
-        var removedKey = removed[i];
-        if (removedKey){
-          var m = taxisOnMap[removedKey];
-          m.setPosition(position);
-          m.setVisible(markersVisible);
-          m.setOpacity(1);
-          taxisOnMap[key] = m;
-          delete taxisOnMap[removedKey];
-          done();
-        } else {
-          taxisOnMap[key] = new google.maps.Marker({
-            position: position,
-            icon: icon,
-            clickable: false,
-            map: map,
-            zIndex: 1,
-            visible: markersVisible,
-          });
-          setTimeout(done, 1);
-        }
-      });
-    });
-
-    q.awaitAll(function(){
-      renderTaxisInfo();
-      setTimeout(renderTaxis, 1000*60); // 60 seconds
-    });
-  }).catch(function(e){
-    console.error(e);
-    setTimeout(renderTaxis, 1000*10); // 10 seconds
-    $infoTaxis.className = '';
-  });
-};
-
-function renderTaxisInfo(){
-  var taxisOnMapKeys = Object.keys(taxisOnMap);
-  if (currentLocation){
-    var taxiCountAround = 0;
-    _.forEach(taxisOnMapKeys, function(key){
-      var coord = key.split(',');
-      var taxiPos = new google.maps.LatLng(coord[0], coord[1]);
-      var distance = google.maps.geometry.spherical.computeDistanceBetween(currentLocation, taxiPos);
-      if (distance <= fiveMinDistance) taxiCountAround++;
-    });
-
-    var nearestTaxiStand;
-    var shortestDistance = Infinity;
-    _.forEach(taxiStandsOnMap, function(stand){
-      var taxiStandPos = new google.maps.LatLng(stand[0], stand[1]);
-      var distance = google.maps.geometry.spherical.computeDistanceBetween(currentLocation, taxiStandPos);
-      if (distance < shortestDistance){
-        shortestDistance = distance;
-        nearestTaxiStand = taxiStandPos;
-      }
-    });
-
-    if (taxiCountAround){
-      $infoTaxis.innerHTML = '<b>' + taxiCountAround + ' available taxis</b> around you.';
-    }
-    if (nearestTaxiStand){
-      var minutes = Math.ceil(shortestDistance/80);
-      $infoTaxis.innerHTML += '<br>Nearest taxi stand is about <b>' + minutes + ' minute' + (minutes == 1 ? '' : 's') +  '</b> walk away.'
-    }
-  } else {
-    $infoTaxis.innerHTML = taxisOnMapKeys.length + ' available taxis!';
   }
-}
 
-function initMap(){
-  map = new google.maps.Map($map, {
-    backgroundColor: '#B3D1FF',
-    disableDefaultUI: true,
-    keyboardShortcuts: true,
-    maxZoom: 16,
-    styles: [
-      {
-        featureType: 'poi.business',
-        stylers: [{visibility: 'off'}]
-      },
-    ]
-  });
-  map.fitBounds(mapBounds);
-  var $boundsWarning = $('bounds-warning');
-  map.addListener('bounds_changed', function(){
-    var bounds = map.getBounds();
-    if (!bounds) return;
-    if (bounds.intersects(mapBounds)){
-      $boundsWarning.classList.remove('visible');
-    } else {
-      $boundsWarning.classList.add('visible');
+  map.addSource('taxis', emptyGeojson);
+  map.addLayer({
+    id: 'taxis-heat',
+    type: 'heatmap',
+    source: 'taxis',
+    maxzoom: 15,
+    paint: {
+      'heatmap-radius': 11,
+      'heatmap-weight': .1,
+      'heatmap-intensity': .5,
+      'heatmap-color': [
+        'interpolate',
+        ['linear'],
+        ['heatmap-density'],
+        0, 'rgba(0,0,255,0)',
+        .1, 'yellow',
+        .5, 'orange',
+        1, 'orangered'
+      ],
     }
-  });
-  $('back-sg').addEventListener('click', function(){
-    $boundsWarning.classList.remove('visible');
-    map.fitBounds(mapBounds);
-  }, false);
+  }, labelLayerId);
 
-  renderTaxiStands();
+  var taxiLayout = {
+    'icon-padding': 0,
+    'icon-size': [
+      'interpolate', ['linear'], ['zoom'],
+      16, .5,
+      22, 1.5
+    ],
+    'icon-allow-overlap': [
+      'step', ['zoom'],
+      false,
+      15, true
+    ],
+    'icon-ignore-placement': [
+      'step', ['zoom'],
+      false,
+      15, true
+    ],
+  };
+  map.addSource('taxis-moving', emptyGeojson);
+  map.addLayer({
+    id: 'taxis-moving',
+    type: 'symbol',
+    source: 'taxis-moving',
+    minzoom: 12,
+    layout: taxiLayout,
+  }, labelLayerId);
+  map.loadImage('assets/taxi.png', function(e, image){
+    if (e) throw e;
+    map.addImage('taxi', image);
+    map.setLayoutProperty('taxis-moving', 'icon-image', 'taxi');
+  });
+  map.addSource('taxis-stationary', emptyGeojson);
+  map.addLayer({
+    id: 'taxis-stationary',
+    type: 'symbol',
+    source: 'taxis-stationary',
+    minzoom: 12,
+    layout: taxiLayout,
+  }, labelLayerId);
+  map.loadImage('assets/taxi-stationary.png', function(e, image){
+    if (e) throw e;
+    map.addImage('taxi-stationary', image);
+    map.setLayoutProperty('taxis-stationary', 'icon-image', 'taxi-stationary');
+  });
+
+  map.addSource('taxi-stands', {
+    type: 'geojson',
+    data: {
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'MultiPoint',
+        coordinates: taxiStandsOnMap,
+      },
+    },
+  });
+  map.addLayer({
+    id: 'taxi-stands',
+    type: 'symbol',
+    source: 'taxi-stands',
+    minzoom: 13,
+    layout: {
+      'icon-padding': 0,
+      'icon-size': [
+        'interpolate', ['linear'], ['zoom'],
+        16, .5,
+        22, 1.5
+      ],
+      'icon-allow-overlap': [
+        'step', ['zoom'],
+        false,
+        15, true
+      ],
+      'icon-ignore-placement': [
+        'step', ['zoom'],
+        false,
+        15, true
+      ],
+      'icon-anchor': 'bottom',
+    },
+  }, labelLayerId);
+  map.loadImage('assets/taxi-stand.png', function(e, image){
+    if (e) throw e;
+    map.addImage('taxi-stand', image);
+    map.setLayoutProperty('taxi-stands', 'icon-image', 'taxi-stand');
+  });
+
+  var taxisSourceLoad = function(e){
+    if (map.isSourceLoaded('taxis-moving') && map.isSourceLoaded('taxis-stationary')){
+      requestAnimationFrame(function(){
+        map.addLayer({
+          id: '3d-buildings',
+          source: 'composite',
+          'source-layer': 'building',
+          filter: ['==', 'extrude', 'true'],
+          type: 'fill-extrusion',
+          minzoom: 15,
+          paint: {
+            'fill-extrusion-opacity': [
+              'interpolate', ['linear'], ['zoom'],
+              15, 0,
+              15.2, .3
+            ],
+            'fill-extrusion-color': '#666',
+            'fill-extrusion-height': [
+              'interpolate', ['linear'], ['zoom'],
+              15, 0,
+              15.05, ['get', 'height']
+            ],
+            'fill-extrusion-base': [
+              'interpolate', ['linear'], ['zoom'],
+              15, 0,
+              15.05, ['get', 'min_height']
+            ],
+          }
+        }, labelLayerId);
+      });
+      map.off('sourcedata', taxisSourceLoad);
+    }
+  };
+  map.on('sourcedata', taxisSourceLoad);
+
+  var renderTaxisInfo = function(){
+    $infoTaxis.className = 'loaded';
+    if (currentLocation && sticking){
+      var taxiCountAround = turf.pointsWithinPolygon(turf.points(taxisOnMap.features[0].geometry.coordinates), fiveMinCircle).features.length;
+      var nearestTaxiStand = turf.nearestPoint(turf.point(currentLocation), turf.points(taxiStandsOnMap));
+      if (taxiCountAround){
+        $infoTaxis.innerHTML = '<b>' + numberWithCommas(taxiCountAround) + ' available taxis</b> around you.';
+        if (nearestTaxiStand){
+          var minutes = Math.ceil(nearestTaxiStand.properties.distanceToPoint*1000/80);
+          $infoTaxis.innerHTML += '<br>Nearest taxi stand is about <b>' + minutes + ' minute' + (minutes == 1 ? '' : 's') +  '</b> walk away.'
+        }
+      }
+    } else {
+      var taxiCount = taxisOnMap.features[0].properties.taxi_count;
+      $infoTaxis.innerHTML = '<b>' + numberWithCommas(taxiCount) + '</b> available taxis!';
+    }
+  }
+
+  var renderTaxis = function(){
+    requestAnimationFrame(function(){
+      $infoTaxis.className = '';
+      fetchTaxis(function(data){
+        map.getSource('taxis').setData(data);
+        if (taxisOnMap){
+          var taxisOnMapStr = taxisOnMap.features[0].geometry.coordinates.toString();
+          var movingTaxis = [];
+          var stationaryTaxis = data.features[0].geometry.coordinates.filter(function(c){
+            var isStationary = taxisOnMapStr.includes(c.toString());
+            if (!isStationary) movingTaxis.push(c);
+            return isStationary;
+          });
+          map.getSource('taxis-stationary').setData({
+            type: 'Feature',
+            geometry: {
+              type: 'MultiPoint',
+              coordinates: stationaryTaxis,
+            },
+        });
+          map.getSource('taxis-moving').setData({
+            type: 'Feature',
+            geometry: {
+              type: 'MultiPoint',
+              coordinates: movingTaxis,
+            },
+        });
+        } else {
+          map.getSource('taxis-moving').setData(data);
+        }
+        taxisOnMap = data;
+        renderTaxisInfo();
+      });
+
+      setTimeout(renderTaxis, 1000*60); // every minute
+    });
+  };
   renderTaxis();
 
-  map.addListener('zoom_changed', function(){
-    var visible = map.getZoom() >= 13;
-    if (markersVisible != visible){
-      _.forEach(taxisOnMap, function(t){
-        t.setVisible(visible);
-      });
-      markersVisible = visible;
-    }
-  });
-
   if (navigator.geolocation){
-    var LocationMarker = _LocationMarker(google);
-    var locationMarker = new LocationMarker({
-      visible: false,
-      map: map,
-    });
-    var locationCircle = new google.maps.Circle({
-      strokeColor: '#4285f4',
-      strokeOpacity: .5,
-      strokeWeight: 3,
-      fillColor: '#4285f4',
-      fillOpacity: .1,
-      map: map,
-      radius: fiveMinDistance,
-      clickable: false,
-      visible: false,
+    map.addSource('current-location-accuracy-radius', emptyGeojson);
+    map.addLayer({
+      id: 'current-location-accuracy-radius',
+      type: 'fill',
+      source: 'current-location-accuracy-radius',
+      layout: {
+        visibility: 'none',
+      },
+      paint: {
+        'fill-color': 'rgba(66, 133, 244, .2)',
+      },
     });
 
-    var $nearestStation = $('nearest-station');
-    var $location = $('location');
+    map.addSource('current-location-fivemin-radius', emptyGeojson);
+    map.addLayer({
+      id: 'current-location-fivemin-radius',
+      type: 'line',
+      source: 'current-location-fivemin-radius',
+      minzoom: 13,
+      layout: {
+        visibility: 'none',
+        'line-cap': 'round',
+      },
+      paint: {
+        'line-width': 3,
+        'line-dasharray': [1, 3],
+        'line-color': 'rgba(66, 133, 244, .75)',
+      },
+    });
+    map.addLayer({
+      id: 'current-location-fivemin-radius-walk',
+      type: 'symbol',
+      source: 'current-location-fivemin-radius',
+      minzoom: 13,
+      layout: {
+        visibility: 'none',
+      },
+      layout: {
+        'symbol-placement': 'line',
+        'symbol-spacing': Math.min(window.innerWidth, window.innerHeight),
+        'text-field': '{title}',
+        'text-size': 14,
+        'text-pitch-alignment': 'viewport',
+        'text-anchor': 'bottom',
+        'text-justify': 'left',
+      },
+      paint: {
+        'text-color': '#4285f4',
+        'text-halo-color': 'rgba(0,0,0,.5)',
+        'text-halo-width': 1,
+      },
+    });
+
+    map.addSource('current-location-marker', emptyGeojson);
+    map.addLayer({
+      id: 'current-location-marker',
+      type: 'circle',
+      source: 'current-location-marker',
+      layout: {
+        visibility: 'none',
+      },
+      paint: {
+        'circle-radius': 6,
+        'circle-color': '#4285f4',
+        'circle-stroke-width': 3,
+        'circle-stroke-color': '#fff',
+        'circle-pitch-alignment': 'map',
+      },
+    });
+
+    map.loadImage('assets/location-viewport.png', function(e, image){
+      if (e) throw e;
+      map.addImage('location-viewport', image);
+      map.addLayer({
+        id: 'current-location-viewport',
+        type: 'symbol',
+        source: 'current-location-marker',
+        layout: {
+          visibility: 'none',
+          'icon-ignore-placement': true,
+          'icon-allow-overlap': true,
+          'icon-image': 'location-viewport',
+          'icon-size': .5,
+          'icon-anchor': 'bottom',
+          'icon-rotation-alignment': 'map',
+        },
+      }, 'current-location-marker');
+    });
+
     $location.style.display = 'block';
 
+    var sticking = false;
     var watching = false;
-    var watch;
+    var compassing = false;
+    var watch, geoWatch;
+    var unstickTimeout;
 
     var unwatch = function(){
-      navigator.geolocation.clearWatch(watch);
-      watching = false;
-      currentLocation = false;
-      locationMarker.setVisible(false);
-      locationCircle.setVisible(false);
-      $location.classList.remove('active');
-      $nearestStation.classList.remove('show');
+      navigator.geolocation.clearWatch(geoWatch);
+      console.log('GEOLOCATION clear watch');
+      watching = sticking = compassing = currentLocation = false;
+      map.setLayoutProperty('current-location-accuracy-radius', 'visibility', 'none');
+      map.setLayoutProperty('current-location-fivemin-radius', 'visibility', 'none');
+      map.setLayoutProperty('current-location-fivemin-radius-walk', 'visibility', 'none');
+      map.setLayoutProperty('current-location-marker', 'visibility', 'none');
+      map.setLayoutProperty('current-location-viewport', 'visibility', 'none');
+      $location.classList.remove('locating', 'active');
+      sessionStorage.removeItem('taxirouter-sg:watch-location');
       renderTaxisInfo();
     };
 
-    $location.addEventListener('click', function(){
-      $location.classList.add('active');
-      if (watching){
-        var markerLocation = locationMarker.getPosition();
-        if (markerLocation.equals(map.getCenter())){
-          if (map.getZoom() < 16) map.setZoom(16);
-        } else {
-          map.panTo(markerLocation);
-        }
-      } else {
-        watch = navigator.geolocation.watchPosition(function(position){
-          var coords = position.coords;
-          currentLocation = new google.maps.LatLng(coords.latitude, coords.longitude);
-          // currentLocation = new google.maps.LatLng(1.2853783884559036, 103.84543418884277);
-          locationMarker.setPosition(currentLocation);
-          locationMarker.setRadius(coords.accuracy);
-          locationMarker.setVisible(true);
-          locationCircle.setCenter(currentLocation);
-          locationCircle.setVisible(true);
+    var unstick = function(){
+      $location.classList.remove('active');
+      compassing = false;
+      sticking = false;
+      renderTaxisInfo();
+      unstickTimeout = setTimeout(unwatch, 5*60*1000); // 5 minutes
+    };
 
-          if (!watching) map.panTo(currentLocation);
-          watching = true;
-          sessionStorage['taxirouter-sg:watch-location'] = 1;
+    var watch = function(){
+      if (watching){
+        var bounds = mapboxgl.LngLat.convert(currentLocation).toBounds(fiveMinDistance);
+        if (sticking){
+          if (compassing){
+            map.stop().fitBounds(bounds, { padding: 50, pitch: 0 });
+          } else {
+            var bearing = map.getLayoutProperty('current-location-viewport', 'icon-rotate') || 0;
+            var pitch = map.getPitch();
+            map.stop().easeTo({
+              center: currentLocation,
+              zoom: 18,
+              pitch: pitch >= 30 ? pitch : 45,
+              bearing: bearing,
+            });
+          }
+          compassing = !compassing;
+        } else {
+          map.stop().fitBounds(bounds, { padding: 50, pitch: 0 });
+        }
+        renderTaxisInfo();
+      } else {
+        $location.classList.add('locating');
+        geoWatch = navigator.geolocation.watchPosition(function(position){
+          $location.classList.remove('locating');
+
+          var coords = position.coords;
+          var lnglat = [coords.longitude, coords.latitude];
+          if (location.hash == '#test-geolocation'){
+            lnglat = [103.843567, 1.28434]; // Chinatown
+          }
+          if (''+lnglat === ''+currentLocation) return; // No idea why
+
+          currentLocation = lnglat;
+          console.log('GEOLOCATION start watch', currentLocation);
 
           // Make sure current location is in Singapore first
-          var bounds = new google.maps.LatLngBounds(
-            new google.maps.LatLng(mapBounds.south, mapBounds.west),
-            new google.maps.LatLng(mapBounds.north, mapBounds.east)
-          );
-          if (!bounds.contains(currentLocation)){
+          var extendedMaxBounds = maxBounds.extend(currentLocation);
+          if (maxBounds.toString() !== extendedMaxBounds.toString()){
             unwatch();
             return;
+          }
+
+          var radius = coords.accuracy;
+          var accuracyCircle = turf.circle(currentLocation, radius/1000);
+          fiveMinCircle = turf.circle(currentLocation, fiveMinDistance/1000, {
+            properties: { title: '5 mins walk' },
+          });
+          map.getSource('current-location-accuracy-radius').setData(accuracyCircle);
+          map.getSource('current-location-fivemin-radius').setData(fiveMinCircle);
+          map.getSource('current-location-marker').setData({
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: lnglat,
+            },
+          });
+
+          map.setLayoutProperty('current-location-accuracy-radius', 'visibility', 'visible');
+          map.setLayoutProperty('current-location-fivemin-radius', 'visibility', 'visible');
+          map.setLayoutProperty('current-location-fivemin-radius-walk', 'visibility', 'visible');
+          map.setLayoutProperty('current-location-marker', 'visibility', 'visible');
+          map.setLayoutProperty('current-location-viewport', 'visibility', 'visible');
+
+          if (!watching){
+            var bounds = mapboxgl.LngLat.convert(lnglat).toBounds(fiveMinDistance);
+            map.fitBounds(bounds, { padding: 50, pitch: 0 });
+            watching = true;
+            sticking = true;
+            sessionStorage.setItem('taxirouter-sg:watch-location', 1);
+          } else if (sticking && !map.isMoving()){
+            map.panTo(lnglat);
           }
 
           renderTaxisInfo();
         }, function(e){
           unwatch();
-          alert('Unable to get your location. Please try again.');
+          setTimeout(watch, 1000); // Retry watch
         }, {
           enableHighAccuracy: true,
           timeout: 60*1000, // 1 min timeout
           maximumAge: 5*1000 // 5-second cache
         });
       }
-    }, false);
+
+      $location.classList.add('active');
+      sticking = true;
+      clearTimeout(unstickTimeout);
+      renderTaxisInfo();
+
+      map.once('dragstart', unstick);
+    };
+
+    $location.addEventListener('click', watch, false);
 
     // Always show current location
-    if (sessionStorage['taxirouter-sg:watch-location']) setTimeout(function(){
-      $location.click();
-    }, 1000);
-
-    map.addListener('dragstart', function(){
-      $location.classList.remove('active');
-    });
+    if (sessionStorage.getItem('taxirouter-sg:watch-location')){
+      var dataLoad = debounce(function(data){
+        requestAnimationFrame(watch);
+        map.off('data', dataLoad);
+      }, 2000);
+      map.on('data', dataLoad);
+    }
 
     if (window.DeviceOrientationEvent){
       window.addEventListener('deviceorientation', function(e){
         if (!watching) return;
         if (!e || e.alpha === null) return;
-        locationMarker.drawCompass();
-        locationMarker.setCompassHeading(e.webkitCompassHeading || e.alpha);
+        var heading = e.webkitCompassHeading || e.alpha;
+        if (map.getLayer('current-location-viewport')){
+          map.setLayoutProperty('current-location-viewport', 'visibility', 'visible');
+          map.setLayoutProperty('current-location-viewport', 'icon-rotate', heading);
+          if (compassing && !map.isMoving()){
+            map.easeTo({
+              center: currentLocation,
+              bearing: heading,
+            });
+          }
+        }
       }, false);
     }
   }
-}
+
+  // Create fake polygon on top so that can detect bounds easily
+  map.addLayer({
+    id: 'max-bounds',
+    type: 'fill',
+    source: {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[
+            maxBounds.getNorthWest().toArray(),
+            maxBounds.getNorthEast().toArray(),
+            maxBounds.getSouthEast().toArray(),
+            maxBounds.getSouthWest().toArray(),
+            maxBounds.getNorthWest().toArray()
+          ]],
+        },
+      },
+    },
+    paint: {
+      'fill-opacity': 0,
+    },
+  });
+  var $boundsWarning = $('bounds-warning');
+  var showHideBoundsWarning = debounce(function(){
+    var hasFeatures = !!map.queryRenderedFeatures({layers: ['max-bounds']}).length;
+    if (hasFeatures){
+      $boundsWarning.classList.remove('visible');
+    } else {
+      $boundsWarning.classList.add('visible');
+    }
+  }, 600);
+  map.on('render', showHideBoundsWarning);
+  $('back-sg').addEventListener('click', function(){
+    $boundsWarning.classList.remove('visible');
+    map.fitBounds(maxBounds, { animate: false });
+  }, false);
+});
+
+$('map').addEventListener('touchmove', function(e){
+  e.preventDefault();
+}, false);
