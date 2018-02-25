@@ -11,7 +11,6 @@
   "license": "MIT",
   "scripts": {
     "taxi-stands": "node scripts/fetch-taxi-stands.js",
-    "lodash": "lodash include=forEach exports=global -d -o assets/lodash.js",
     "serve": "serve",
     "inliner": "node scripts/inliner.js _index.html index.html",
     "watch": "chokidar '_index.html' 'assets/*.js' 'assets/*.css' 'data/*.json' -c 'npm run inliner'",

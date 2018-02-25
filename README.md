@@ -28,7 +28,6 @@ Here's a sprinkle of NPM magic:
 
 - `npm i` - install everything
 - `npm run taxi-stands` - fetch taxi stands
-- `npm run lodash` - generate a custom Lodash build
 - `npm run inliner` - inline all assets from `_index.html` to `index.html`
 - `npm run watch` - watch files and run `inliner` when files changed
 - `npm run serve` - run a local server
