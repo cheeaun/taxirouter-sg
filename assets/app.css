@@ -223,6 +223,13 @@ header svg {
 #location svg{
   fill: #666;
 }
+#location .compass,
+#location.compass .location{
+  display: none;
+}
+#location.compass .compass{
+  display: block;
+}
 #location.locating{
   pointer-events: none;
 }

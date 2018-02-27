@@ -386,7 +386,7 @@ map.on('load', function(){
     };
 
     var unstick = function(){
-      $location.classList.remove('active');
+      $location.classList.remove('active', 'compass');
       compassing = false;
       sticking = false;
       renderTaxisInfo();
@@ -410,6 +410,7 @@ map.on('load', function(){
             });
           }
           compassing = !compassing;
+          $location.classList.toggle('compass', compassing);
         } else {
           map.stop().fitBounds(bounds, { padding: 50, pitch: 0 });
         }
