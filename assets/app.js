@@ -225,7 +225,7 @@ map.on('load', function(){
         $infoTaxis.innerHTML = '<b>' + numberWithCommas(taxiCountAround) + ' available taxis</b> around you.';
         if (nearestTaxiStand){
           var minutes = Math.ceil(nearestTaxiStand.properties.distanceToPoint*1000/80);
-          $infoTaxis.innerHTML += '<br>Nearest taxi stand is about <b>' + minutes + ' minute' + (minutes == 1 ? '' : 's') +  '</b> walk away.'
+          $infoTaxis.innerHTML += '<br>Nearest taxi stand is about <b>' + minutes + ' minute' + (minutes == 1 ? '' : 's') +  '</b> walk&nbsp;away.'
         }
       }
     } else {
