@@ -259,6 +259,7 @@ header svg {
   padding: 0;
   border: 0;
   color: #fff;
+  background-color: transparent;
   text-decoration: underline;
 }
 
