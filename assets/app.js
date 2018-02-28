@@ -6,6 +6,38 @@ function debounce(a,b,c){var d;return function(){var e=this,f=arguments;clearTim
 // https://stackoverflow.com/a/2901298/20838
 function numberWithCommas(x){ return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 
+// https://stackoverflow.com/a/21829819/20838
+// http://w3c.github.io/deviceorientation/spec-source-orientation.html#worked-example
+var degtorad = Math.PI / 180; // Degree-to-Radian conversion
+function compassHeading(alpha, beta, gamma){
+  var _x = beta  ? beta  * degtorad : 0; // beta value
+  var _y = gamma ? gamma * degtorad : 0; // gamma value
+  var _z = alpha ? alpha * degtorad : 0; // alpha value
+
+  var cX = Math.cos( _x );
+  var cY = Math.cos( _y );
+  var cZ = Math.cos( _z );
+  var sX = Math.sin( _x );
+  var sY = Math.sin( _y );
+  var sZ = Math.sin( _z );
+
+  // Calculate Vx and Vy components
+  var Vx = - cZ * sY - sZ * sX * cY;
+  var Vy = - sZ * sY + cZ * sX * cY;
+
+  // Calculate compass heading
+  var compassHeading = Math.atan( Vx / Vy );
+
+  // Convert compass heading to use whole unit circle
+  if( Vy < 0 ) {
+    compassHeading += Math.PI;
+  } else if( Vx < 0 ) {
+    compassHeading += 2 * Math.PI;
+  }
+
+  return compassHeading * ( 180 / Math.PI ); // Compass Heading (in degrees)
+}
+
 var $infoTaxis = $('info-taxis');
 var $location = $('location');
 var fiveMinDistance = 80 * 5; // meters, via https://en.wikipedia.org/wiki/Walking_distance_measure
@@ -499,10 +531,13 @@ map.on('load', function(){
     }
 
     if (window.DeviceOrientationEvent){
-      window.addEventListener('deviceorientation', function(e){
+      // https://developers.google.com/web/updates/2016/03/device-orientation-changes
+      // https://stackoverflow.com/a/47870694/20838
+      var deviceorientation = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
+      window.addEventListener(deviceorientation, function(e){
         if (!watching) return;
         if (!e || e.alpha === null) return;
-        var heading = e.webkitCompassHeading || e.alpha;
+        var heading = e.compassHeading || e.webkitCompassHeading || compassHeading(e.alpha, e.beta, e.gamma);
         if (map.getLayer('current-location-viewport')){
           map.setLayoutProperty('current-location-viewport', 'visibility', 'visible');
           map.setLayoutProperty('current-location-viewport', 'icon-rotate', heading);
