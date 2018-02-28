@@ -11,6 +11,7 @@
   "license": "MIT",
   "scripts": {
     "taxi-stands": "node scripts/fetch-taxi-stands.js",
+    "turf": "browserify assets/turf-modules.js -s turf > assets/turf.js",
     "serve": "serve",
     "inliner": "node scripts/inliner.js _index.html index.html",
     "watch": "chokidar '_index.html' 'assets/*.js' 'assets/*.css' 'data/*.json' -c 'npm run inliner'",
@@ -18,11 +19,18 @@
     "deploy": "git checkout gh-pages && git merge master && git push origin gh-pages && git checkout master"
   },
   "devDependencies": {
+    "browserify": "^16.1.0",
     "cheerio": "~1.0.0-rc.2",
     "chokidar-cli": "~1.2.0",
     "clean-css": "~4.1.9",
     "parallelshell": "~3.0.2",
     "serve": "~6.5.0",
     "uglify-js": "~3.3.12"
+  },
+  "dependencies": {
+    "@turf/circle": "~5.1.5",
+    "@turf/helpers": "~6.0.1",
+    "@turf/nearest-point": "~5.1.5",
+    "@turf/points-within-polygon": "~5.1.5"
   }
 }

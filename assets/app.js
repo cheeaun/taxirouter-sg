@@ -43,9 +43,7 @@ var $location = $('location');
 var fiveMinDistance = 80 * 5; // meters, via https://en.wikipedia.org/wiki/Walking_distance_measure
 var emptyGeojson = {
   type: 'geojson',
-  data: {
-    type: 'Feature',
-  },
+  data: { type: 'Feature' },
 };
 var taxisOnMap;
 var fiveMinCircle;
@@ -173,14 +171,7 @@ map.on('load', function(){
 
   map.addSource('taxi-stands', {
     type: 'geojson',
-    data: {
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'MultiPoint',
-        coordinates: taxiStandsOnMap,
-      },
-    },
+    data: turf.multiPoint(taxiStandsOnMap),
   });
   map.addLayer({
     id: 'taxi-stands',
@@ -279,20 +270,8 @@ map.on('load', function(){
             if (!isStationary) movingTaxis.push(c);
             return isStationary;
           });
-          map.getSource('taxis-stationary').setData({
-            type: 'Feature',
-            geometry: {
-              type: 'MultiPoint',
-              coordinates: stationaryTaxis,
-            },
-        });
-          map.getSource('taxis-moving').setData({
-            type: 'Feature',
-            geometry: {
-              type: 'MultiPoint',
-              coordinates: movingTaxis,
-            },
-        });
+          map.getSource('taxis-stationary').setData(turf.multiPoint(stationaryTaxis));
+          map.getSource('taxis-moving').setData(turf.multiPoint(movingTaxis));
         } else {
           map.getSource('taxis-moving').setData(data);
         }
@@ -476,13 +455,7 @@ map.on('load', function(){
           });
           map.getSource('current-location-accuracy-radius').setData(accuracyCircle);
           map.getSource('current-location-fivemin-radius').setData(fiveMinCircle);
-          map.getSource('current-location-marker').setData({
-            type: 'Feature',
-            geometry: {
-              type: 'Point',
-              coordinates: lnglat,
-            },
-          });
+          map.getSource('current-location-marker').setData(turf.point(lnglat));
 
           map.setLayoutProperty('current-location-accuracy-radius', 'visibility', 'visible');
           map.setLayoutProperty('current-location-fivemin-radius', 'visibility', 'visible');
@@ -558,19 +531,13 @@ map.on('load', function(){
     type: 'fill',
     source: {
       type: 'geojson',
-      data: {
-        type: 'Feature',
-        geometry: {
-          type: 'Polygon',
-          coordinates: [[
-            maxBounds.getNorthWest().toArray(),
-            maxBounds.getNorthEast().toArray(),
-            maxBounds.getSouthEast().toArray(),
-            maxBounds.getSouthWest().toArray(),
-            maxBounds.getNorthWest().toArray()
-          ]],
-        },
-      },
+      data: turf.polygon([[
+        maxBounds.getNorthWest().toArray(),
+        maxBounds.getNorthEast().toArray(),
+        maxBounds.getSouthEast().toArray(),
+        maxBounds.getSouthWest().toArray(),
+        maxBounds.getNorthWest().toArray()
+      ]]),
     },
     paint: {
       'fill-opacity': 0,
