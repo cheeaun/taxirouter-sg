@@ -277,3 +277,17 @@ header svg {
 .mapboxgl-ctrl-attrib{
   margin-top: 10px !important;
 }
+
+.mapboxgl-ctrl-custom-pitch{
+  font-weight: bold;
+  color: #000;
+  font-size: 15px;
+  letter-spacing: -.5px;
+}
+.active .mapboxgl-ctrl-custom-pitch{
+  color: #4285f4;
+}
+.mapboxgl-ctrl-custom-pitch span{
+  display: block;
+  transition: transform .3s ease-in-out;
+}

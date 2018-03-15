@@ -84,6 +84,41 @@ var map = new mapboxgl.Map({
 map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'top-right');
 map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
+function PitchControl(){};
+PitchControl.prototype.onAdd = function(map){
+  this._map = map;
+  var container = document.createElement('div');
+  container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
+  container.innerHTML = '<button class="mapboxgl-ctrl-icon mapboxgl-ctrl-custom-pitch" type="button"><span>3D</span></button>'
+  container.onclick = function(){
+    var pitch = map.getPitch();
+    var nextPitch = 0;
+    if (pitch < 30){
+      nextPitch = 30;
+    } else if (pitch < 45){
+      nextPitch = 45;
+    } else if (pitch < 60){
+      nextPitch = 60;
+    }
+    map.easeTo({ pitch: nextPitch });
+  };
+  map.on('pitchend', this.onPitch.bind(this));
+  this._container = container;
+  return this._container;
+};
+PitchControl.prototype.onPitch = function(){
+  var pitch = map.getPitch();
+  this._container.classList.toggle('active', !!pitch);
+  var text = this._container.getElementsByTagName('span')[0];
+  text.style.transform = 'rotate3d(1,0,0,' + pitch + 'deg)';
+}
+PitchControl.prototype.onRemove = function(){
+  this._container.parentNode.removeChild(this._container);
+  this._map.off('pitchend', this.onPitch.bind(this));
+  this._map = undefined;
+};
+map.addControl(new PitchControl(), 'top-right');
+
 var maxBoundsLike = [
   [ 103.6016626883025, 1.233357600011331 ], // sw
   [ 104.0381760444838, 1.473818072475055 ] // ne
