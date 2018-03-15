@@ -28,7 +28,7 @@
     "uglify-js": "~3.3.14"
   },
   "dependencies": {
-    "@turf/circle": "~6.0.0",
+    "@turf/circle": "~5.1.5",
     "@turf/helpers": "~6.0.1",
     "@turf/nearest-point": "~5.1.5",
     "@turf/points-within-polygon": "~5.1.5"
