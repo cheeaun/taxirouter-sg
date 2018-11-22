@@ -278,6 +278,12 @@ header svg {
 .mapboxgl-ctrl-attrib{
   margin-top: 10px !important;
 }
+.mapboxgl-ctrl-attrib.mapboxgl-compact {
+  min-height: 24px;
+}
+.mapboxgl-ctrl-attrib.mapboxgl-compact:not(:hover) {
+  background-color: transparent;
+}
 
 .mapboxgl-ctrl-custom-pitch{
   font-weight: bold;
