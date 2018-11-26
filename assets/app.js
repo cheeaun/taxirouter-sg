@@ -73,7 +73,7 @@ function fetchTaxis(fn){
   xhr.send();
 };
 
-mapboxgl.accessToken = 'pk.eyJ1IjoiY2hlZWF1biIsImEiOiJjam9yNHJsYmIwYjNlM3ZwYTRtMno3ZnMxIn0.kPDvjhwDp5tJmMozZ4qVCA';
+mapboxgl.accessToken = 'pk.eyJ1IjoiY2hlZWF1biIsImEiOiJjam95aHNtajAyYng2M3FrZm96Mjd4MDlzIn0.O0ulrgNkC_GiuqN8q-Mhog';
 var map = new mapboxgl.Map({
   container: 'map',
   style: 'mapbox://styles/mapbox/navigation-preview-night-v2',
