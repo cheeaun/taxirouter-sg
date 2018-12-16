@@ -65,7 +65,7 @@ workbox.routing.registerRoute(
     cacheName: 'mapbox',
     plugins: [
       new workbox.expiration.Plugin({
-        maxAgeSeconds: 14 * 24 * 60 * 60, // 2 weeks
+        maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
       }),
       new workbox.cacheableResponse.Plugin({
         statuses: [0, 200]
