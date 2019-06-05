@@ -596,25 +596,3 @@ map.once('styledata', function(){
 $('map').addEventListener('touchmove', function(e){
   e.preventDefault();
 }, false);
-
-if (location.hash.replace(/^#/, '') === 'noads') {
-  try {
-    localStorage.setItem('noads', true);
-  } catch (e) {}
-  location.hash = '';
-  document.body.classList.add('noads');
-} else {
-  var noAds = false;
-  try {
-    noAds = localStorage.getItem('noads');
-  } catch (e) {}
-  if (noAds) {
-    document.body.classList.add('noads');
-  } else {
-    var s = document.createElement('script');
-    s.async = true;
-    s.src = 'https://cdn.carbonads.com/carbon.js?serve=CK7DEK3L&placement=taxiroutersg';
-    s.id = '_carbonads_js';
-    document.body.appendChild(s);
-  }
-}
