@@ -69,7 +69,6 @@ function fetchTaxis(fn){
     fn(JSON.parse(this.responseText));
   };
   xhr.open('GET', 'https://api.data.gov.sg/v1/transport/taxi-availability');
-  xhr.setRequestHeader('api-key', 'QSlWniO8ADQu2BmiVAEueFIxHF4GcaQ9');
   xhr.send();
 };
 
