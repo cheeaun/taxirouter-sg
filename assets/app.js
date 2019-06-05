@@ -74,12 +74,18 @@ function fetchTaxis(fn){
 };
 
 mapboxgl.accessToken = 'pk.eyJ1IjoiY2hlZWF1biIsImEiOiJjam95aHNtajAyYng2M3FrZm96Mjd4MDlzIn0.O0ulrgNkC_GiuqN8q-Mhog';
+var maxBoundsLike = [
+  [ 103.6016626883025, 1.233357600011331 ], // sw
+  [ 104.0381760444838, 1.473818072475055 ] // ne
+];
+var maxBounds = mapboxgl.LngLatBounds.convert(maxBoundsLike);
 var map = new mapboxgl.Map({
   container: 'map',
   style: 'mapbox://styles/mapbox/navigation-preview-night-v2',
   logoPosition: 'top-right',
   attributionControl: false,
   boxZoom: false,
+  bounds: maxBoundsLike,
 });
 map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'top-right');
 map.addControl(new mapboxgl.NavigationControl(), 'top-right');
@@ -119,14 +125,7 @@ PitchControl.prototype.onRemove = function(){
 };
 map.addControl(new PitchControl(), 'top-right');
 
-var maxBoundsLike = [
-  [ 103.6016626883025, 1.233357600011331 ], // sw
-  [ 104.0381760444838, 1.473818072475055 ] // ne
-];
-var maxBounds = mapboxgl.LngLatBounds.convert(maxBoundsLike);
-map.fitBounds(maxBounds, { animate: false });
-
-map.on('load', function(){
+map.once('styledata', function(){
   var layers = map.getStyle().layers;
   // Find the index of the first symbol layer in the map style
   var labelLayerId;
