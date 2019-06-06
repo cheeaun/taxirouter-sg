@@ -63,13 +63,15 @@ if (window.localStorage && !localStorage.getItem('taxirouter-sg:about')){
   localStorage.setItem('taxirouter-sg:about', 1);
 }
 
+var firstFetch = true;
 function fetchTaxis(fn){
   var xhr = new XMLHttpRequest();
   xhr.onload = function(){
     fn(JSON.parse(this.responseText));
   };
-  xhr.open('GET', 'https://api.data.gov.sg/v1/transport/taxi-availability');
+  xhr.open('GET', 'https://api.data.gov.sg/v1/transport/taxi-availability' + (firstFetch ? '' : ('?' + (+new Date()))));
   xhr.send();
+  firstFetch = false;
 };
 
 mapboxgl.accessToken = 'pk.eyJ1IjoiY2hlZWF1biIsImEiOiJjam95aHNtajAyYng2M3FrZm96Mjd4MDlzIn0.O0ulrgNkC_GiuqN8q-Mhog';
