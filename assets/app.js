@@ -164,7 +164,7 @@ map.once('styledata', function(){
     'icon-size': [
       'interpolate', ['linear'], ['zoom'],
       16, .5,
-      22, 1.5
+      18, 1.5
     ],
     'icon-allow-overlap': [
       'step', ['zoom'],
@@ -329,7 +329,7 @@ map.once('styledata', function(){
         visibility: 'none',
       },
       paint: {
-        'fill-color': 'rgba(66, 133, 244, .2)',
+        'fill-color': 'rgba(66, 133, 244, .05)',
       },
     });
 
@@ -367,9 +367,9 @@ map.once('styledata', function(){
         'text-justify': 'left',
       },
       paint: {
-        'text-color': '#4285f4',
-        'text-halo-color': 'rgba(0,0,0,.5)',
-        'text-halo-width': 1,
+        'text-color': '#8ab4f8',
+        'text-halo-color': 'rgba(0,0,0,.25)',
+        'text-halo-width': 2,
       },
     });
 
