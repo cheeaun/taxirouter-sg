@@ -496,7 +496,7 @@ map.once('styledata', function(){
           map.setLayoutProperty('current-location-fivemin-radius', 'visibility', 'visible');
           map.setLayoutProperty('current-location-fivemin-radius-walk', 'visibility', 'visible');
           map.setLayoutProperty('current-location-marker', 'visibility', 'visible');
-          map.setLayoutProperty('current-location-viewport', 'visibility', 'visible');
+          // map.setLayoutProperty('current-location-viewport', 'visibility', 'visible');
 
           if (!watching){
             var bounds = mapboxgl.LngLat.convert(lnglat).toBounds(fiveMinDistance);
@@ -539,24 +539,40 @@ map.once('styledata', function(){
     }
 
     if (window.DeviceOrientationEvent){
-      // https://developers.google.com/web/updates/2016/03/device-orientation-changes
-      // https://stackoverflow.com/a/47870694/20838
-      var deviceorientation = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
-      window.addEventListener(deviceorientation, function(e){
-        if (!watching) return;
-        if (!e || e.alpha === null) return;
-        var heading = e.compassHeading || e.webkitCompassHeading || compassHeading(e.alpha, e.beta, e.gamma);
-        if (map.getLayer('current-location-viewport')){
-          map.setLayoutProperty('current-location-viewport', 'visibility', 'visible');
-          map.setLayoutProperty('current-location-viewport', 'icon-rotate', heading);
-          if (compassing && !map.isMoving()){
-            map.easeTo({
-              center: currentLocation,
-              bearing: heading,
-            });
+      function attachOrientation() {
+        // https://developers.google.com/web/updates/2016/03/device-orientation-changes
+        // https://stackoverflow.com/a/47870694/20838
+        var deviceorientation = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
+        window.addEventListener(deviceorientation, function(e){
+          if (!watching) return;
+          if (!map.getLayer('current-location-viewport')) return;
+          var heading = (e && e.alpha) && e.compassHeading || e.webkitCompassHeading || compassHeading(e.alpha, e.beta, e.gamma);
+          console.log('heading', heading);
+          if (heading) {
+            map.setLayoutProperty('current-location-viewport', 'visibility', 'visible');
+            map.setLayoutProperty('current-location-viewport', 'icon-rotate', heading);
+            if (compassing && !map.isMoving()){
+              map.easeTo({
+                center: currentLocation,
+                bearing: heading,
+              });
+            }
+          } else {
+            map.setLayoutProperty('current-location-viewport', 'visibility', 'none');
           }
-        }
-      }, false);
+        }, false);
+      };
+      if (typeof DeviceOrientationEvent.requestPermission === 'function'){
+        DeviceOrientationEvent.requestPermission()
+          .then(function(permissionState){
+            if (permissionState === 'granted'){
+              attachOrientation();
+            }
+          })
+          .catch(console.error);
+      } else {
+        attachOrientation();
+      }
     }
   }
 
