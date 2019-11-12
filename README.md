@@ -24,6 +24,24 @@ Technicalities
 
 Data is from <https://data.gov.sg/>.
 
+Before `npm i`, install `nss` so that localhost `https` works. Based on [https-localhost](https://github.com/daquinoaldo/https-localhost#dependencies).
+
+- MacOS
+
+  ``` bash
+  brew install nss
+  ```
+
+- Linux
+
+  ``` bash
+  sudo apt install libnss3-tools
+      -or-
+  sudo yum install nss-tools
+      -or-
+  sudo pacman -S nss
+  ```
+
 Here's a sprinkle of NPM magic:
 
 - `npm i` - install everything
