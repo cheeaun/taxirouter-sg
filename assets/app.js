@@ -543,19 +543,23 @@ map.once('styledata', function(){
         // https://developers.google.com/web/updates/2016/03/device-orientation-changes
         // https://stackoverflow.com/a/47870694/20838
         var deviceorientation = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
+        var prevHeading;
         window.addEventListener(deviceorientation, function(e){
           if (!watching) return;
           if (!map.getLayer('current-location-viewport')) return;
           var heading = (e && e.alpha) && e.compassHeading || e.webkitCompassHeading || compassHeading(e.alpha, e.beta, e.gamma);
-          console.log('heading', heading);
           if (heading) {
-            map.setLayoutProperty('current-location-viewport', 'visibility', 'visible');
-            map.setLayoutProperty('current-location-viewport', 'icon-rotate', heading);
-            if (compassing && !map.isMoving()){
-              map.easeTo({
-                center: currentLocation,
-                bearing: heading,
-              });
+            if (heading !== prevHeading) {
+              console.log('heading', heading);
+              prevHeading = heading;
+              map.setLayoutProperty('current-location-viewport', 'visibility', 'visible');
+              map.setLayoutProperty('current-location-viewport', 'icon-rotate', heading);
+              if (compassing && !map.isMoving()){
+                map.easeTo({
+                  center: currentLocation,
+                  bearing: heading,
+                });
+              }
             }
           } else {
             map.setLayoutProperty('current-location-viewport', 'visibility', 'none');
@@ -563,13 +567,18 @@ map.once('styledata', function(){
         }, false);
       };
       if (typeof DeviceOrientationEvent.requestPermission === 'function'){
-        DeviceOrientationEvent.requestPermission()
-          .then(function(permissionState){
-            if (permissionState === 'granted'){
-              attachOrientation();
-            }
-          })
-          .catch(console.error);
+        var granted = false;
+        document.addEventListener('touchstart', function(){
+          if (granted) return;
+          DeviceOrientationEvent.requestPermission()
+            .then(function(permissionState){
+              if (permissionState === 'granted'){
+                attachOrientation();
+                granted = true;
+              }
+            })
+            .catch(console.error);
+        }, false);
       } else {
         attachOrientation();
       }
