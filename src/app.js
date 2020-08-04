@@ -1,0 +1,662 @@
+// https://github.com/parcel-bundler/parcel/issues/3375#issuecomment-599160200
+import 'regenerator-runtime/runtime';
+
+const mapboxgl = require('mapbox-gl');
+
+const taxiStandsOnMap = require('url:../data/taxi-stands.json');
+
+const helpers = require('@turf/helpers');
+const pointsWithinPolygon = require('@turf/points-within-polygon').default;
+const nearestPoint = require('@turf/nearest-point').default;
+const circle = require('@turf/circle').default;
+const multiPoint = helpers.multiPoint;
+const point = helpers.point;
+const points = helpers.points;
+const featureCollection = helpers.featureCollection;
+
+function $(id) {
+  return document.getElementById(id);
+}
+
+// https://stackoverflow.com/a/2901298/20838
+function numberWithCommas(x) {
+  return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+// https://stackoverflow.com/a/21829819/20838
+// http://w3c.github.io/deviceorientation/spec-source-orientation.html#worked-example
+const degtorad = Math.PI / 180; // Degree-to-Radian conversion
+function compassHeading(alpha, beta, gamma) {
+  const _x = beta ? beta * degtorad : 0; // beta value
+  const _y = gamma ? gamma * degtorad : 0; // gamma value
+  const _z = alpha ? alpha * degtorad : 0; // alpha value
+
+  const cX = Math.cos(_x);
+  const cY = Math.cos(_y);
+  const cZ = Math.cos(_z);
+  const sX = Math.sin(_x);
+  const sY = Math.sin(_y);
+  const sZ = Math.sin(_z);
+
+  // Calculate Vx and Vy components
+  const Vx = -cZ * sY - sZ * sX * cY;
+  const Vy = -sZ * sY + cZ * sX * cY;
+
+  // Calculate compass heading
+  let compassHeading = Math.atan(Vx / Vy);
+
+  // Convert compass heading to use whole unit circle
+  if (Vy < 0) {
+    compassHeading += Math.PI;
+  } else if (Vx < 0) {
+    compassHeading += 2 * Math.PI;
+  }
+
+  return compassHeading * (180 / Math.PI); // Compass Heading (in degrees)
+}
+
+const $infoTaxis = $('info-taxis');
+const $location = $('location');
+const walkingDistance = 80 * 2; // meters, via https://en.wikipedia.org/wiki/Walking_distance_measure
+const emptyGeojson = {
+  type: 'geojson',
+  buffer: 16,
+  tolerance: 1,
+  data: { type: 'Feature' },
+};
+let taxisOnMap;
+let walkingCircle;
+let currentLocation;
+
+const $about = $('about');
+const $aboutOkay = $('about-okay');
+
+const $header = $('heading');
+const toggleAbout = function () {
+  $about.classList.toggle('show');
+};
+$header.addEventListener('click', toggleAbout, false);
+$aboutOkay.addEventListener('click', toggleAbout, false);
+if (window.localStorage && !localStorage.getItem('taxirouter-sg:about')) {
+  $about.classList.add('show');
+  localStorage.setItem('taxirouter-sg:about', '1');
+}
+
+let firstFetch = true;
+function fetchTaxis(fn) {
+  fetch(
+    'https://api.data.gov.sg/v1/transport/taxi-availability' +
+      (firstFetch ? '' : '?' + +new Date()),
+  )
+    .then(function (res) {
+      return res.json();
+    })
+    .then(fn);
+  firstFetch = false;
+}
+
+mapboxgl.accessToken =
+  'pk.eyJ1IjoiY2hlZWF1biIsImEiOiJjam95aHNtajAyYng2M3FrZm96Mjd4MDlzIn0.O0ulrgNkC_GiuqN8q-Mhog';
+const maxBoundsLike = [
+  [103.6017, 1.2334], // sw
+  [104.0381, 1.4738], // ne
+];
+const maxBounds = mapboxgl.LngLatBounds.convert(maxBoundsLike);
+const map = (window.$map = new mapboxgl.Map({
+  container: 'map',
+  style:
+    'mapbox://styles/cheeaun/ckda1ntp40s491iog8ebl4236/draft?optimize=true',
+  boxZoom: false,
+  bounds: maxBoundsLike,
+  minZoom: 8,
+  renderWorldCopies: false,
+}));
+map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+function PitchControl() {}
+PitchControl.prototype.onAdd = function (map) {
+  this._map = map;
+  const container = document.createElement('div');
+  container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
+  container.innerHTML =
+    '<button class="mapboxgl-ctrl-icon mapboxgl-ctrl-custom-pitch" type="button"><span>3D</span></button>';
+  container.onclick = function () {
+    const pitch = map.getPitch();
+    map.easeTo({ pitch: pitch < 10 ? 60 : 0 });
+  };
+  map.on('pitchend', this.onPitch.bind(this));
+  this._container = container;
+  return this._container;
+};
+PitchControl.prototype.onPitch = function () {
+  const pitch = map.getPitch();
+  this._container.classList.toggle('active', !!pitch);
+};
+PitchControl.prototype.onRemove = function () {
+  this._container.parentNode.removeChild(this._container);
+  this._map.off('pitchend', this.onPitch.bind(this));
+  this._map = undefined;
+};
+map.addControl(new PitchControl(), 'top-right');
+
+map.addImage('taxi', $('img-taxi'));
+map.addImage('taxi-stationary', $('img-taxi-stationary'));
+map.addImage('taxi-stand', $('img-taxi-stand'));
+
+map.once('styledata', () => {
+  const layers = map.getStyle().layers;
+  console.log(layers);
+
+  layers.forEach((l) => {
+    const isTrafficLayer = /^traffic/i.test(l.id);
+    if (isTrafficLayer) {
+      map.setLayerZoomRange(l.id, 14, 24);
+      map.setLayoutProperty(l.id, 'visibility', 'visible', { validate: false });
+      return;
+    }
+
+    if (
+      l.type === 'symbol' ||
+      l.type === 'line' ||
+      l.type === 'fill-extrusion'
+    ) {
+      const filter = map.getFilter(l.id);
+      let newFilter = ['==', ['get', 'iso_3166_1'], 'SG'];
+      if (filter) {
+        if (filter[0] === 'all') {
+          newFilter = [...filter, ['==', ['get', 'iso_3166_1'], 'SG']];
+        } else {
+          newFilter = ['all', ['==', ['get', 'iso_3166_1'], 'SG'], filter];
+        }
+      }
+      map.setFilter(l.id, newFilter, { validate: false });
+    }
+  });
+});
+
+map.once('load', function () {
+  // const layers = map.getStyle().layers;
+  // console.log(layers);
+  // Find the index of the first symbol layer in the map style
+  // const labelLayerId = layers.find(
+  //   (l) => l.type === 'symbol' && l.layout['text-field'],
+  // );
+
+  map.addSource('taxis', emptyGeojson);
+  map.addLayer({
+    id: 'taxis',
+    type: 'symbol',
+    source: 'taxis',
+    minzoom: 10,
+    layout: {
+      'icon-padding': 1,
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.1, 18, 1],
+      // 'icon-ignore-placement': true,
+      'icon-allow-overlap': true,
+      'icon-image': [
+        'case',
+        ['to-boolean', ['get', 'stationary']],
+        'taxi-stationary',
+        'taxi',
+      ],
+      'symbol-sort-key': ['case', ['to-boolean', ['get', 'stationary']], 1, 2],
+    },
+  });
+  map.addLayer({
+    id: 'taxis-heat',
+    type: 'heatmap',
+    source: 'taxis',
+    maxzoom: 13,
+    paint: {
+      'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 0.5, 10, 2],
+      'heatmap-color': [
+        'interpolate',
+        ['linear'],
+        ['heatmap-density'],
+        0,
+        'transparent',
+        0.5,
+        '#fdc100',
+        1,
+        'lightyellow',
+      ],
+    },
+  });
+
+  map.addSource('taxi-stands', {
+    type: 'geojson',
+    buffer: 0,
+    data: multiPoint(taxiStandsOnMap),
+  });
+  map.addLayer({
+    id: 'taxi-stands',
+    type: 'symbol',
+    source: 'taxi-stands',
+    minzoom: 16,
+    layout: {
+      'icon-padding': 0,
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 16, 0.5, 22, 1.5],
+      'icon-anchor': 'bottom',
+      'icon-image': 'taxi-stand',
+    },
+  });
+
+  let sticking = false;
+  let watching = false;
+  let compassing = false;
+  let toCompassing = false;
+  let geoWatch;
+  let unstickTimeout;
+
+  const renderTaxisInfo = function () {
+    $infoTaxis.className = 'loaded';
+    if (currentLocation && sticking) {
+      const taxiCountAround = pointsWithinPolygon(
+        points(taxisOnMap.features[0].geometry.coordinates),
+        walkingCircle,
+      ).features.length;
+      const nearestTaxiStand = nearestPoint(
+        point(currentLocation),
+        points(taxiStandsOnMap),
+      );
+      if (taxiCountAround) {
+        $infoTaxis.innerHTML =
+          '<b>' +
+          numberWithCommas(taxiCountAround) +
+          ' available taxis</b> around you.';
+        if (nearestTaxiStand) {
+          const minutes = Math.ceil(
+            (nearestTaxiStand.properties.distanceToPoint * 1000) / 80,
+          );
+          $infoTaxis.innerHTML +=
+            '<br>Nearest taxi stand is about <b>' +
+            minutes +
+            ' minute' +
+            (minutes == 1 ? '' : 's') +
+            '</b> walk&nbsp;away.';
+        }
+      }
+    } else {
+      const taxiCount = taxisOnMap.features[0].properties.taxi_count;
+      $infoTaxis.innerHTML =
+        '<b>' + numberWithCommas(taxiCount) + '</b> available taxis!';
+    }
+  };
+
+  const renderTaxis = function () {
+    requestAnimationFrame(function () {
+      $infoTaxis.className = '';
+      fetchTaxis(function (data) {
+        if (taxisOnMap) {
+          const taxisOnMapStr = taxisOnMap.features[0].geometry.coordinates.toString();
+          const stationaryTaxis = [];
+          const movingTaxis = [];
+          const { coordinates } = data.features[0].geometry;
+          for (let i = 0, l = coordinates.length; i < l; i++) {
+            const c = coordinates[i];
+            const isStationary = taxisOnMapStr.includes(c.toString());
+            if (isStationary) {
+              stationaryTaxis.push(c);
+            } else {
+              movingTaxis.push(c);
+            }
+          }
+          const collection = featureCollection([
+            multiPoint(stationaryTaxis, { stationary: true }),
+            multiPoint(movingTaxis, { stationary: false }),
+          ]);
+          map.getSource('taxis').setData(collection);
+        } else {
+          map.getSource('taxis').setData(data);
+        }
+        taxisOnMap = data;
+        renderTaxisInfo();
+      });
+
+      setTimeout(renderTaxis, 1000 * 60); // every minute
+    });
+  };
+  renderTaxis();
+
+  if (navigator.geolocation) {
+    map.addSource('current-location', emptyGeojson);
+    map.addLayer({
+      id: 'current-location-accuracy-radius',
+      type: 'fill',
+      source: 'current-location',
+      filter: ['==', ['get', 'type'], 'accuracy'],
+      minzoom: 15,
+      layout: {
+        visibility: 'none',
+      },
+      paint: {
+        'fill-color': 'rgba(66, 133, 244, .05)',
+      },
+    });
+
+    map.addLayer(
+      {
+        id: 'current-location-walking-radius',
+        type: 'line',
+        source: 'current-location',
+        filter: ['==', ['get', 'type'], 'walking'],
+        minzoom: 14,
+        layout: {
+          visibility: 'none',
+          'line-cap': 'round',
+        },
+        paint: {
+          'line-width': 3,
+          'line-dasharray': [1, 3],
+          'line-color': 'rgba(66, 133, 244, .75)',
+        },
+      },
+      'building-extrusion',
+    );
+
+    map.addLayer(
+      {
+        id: 'current-location-walking-radius-label',
+        type: 'symbol',
+        source: 'current-location',
+        filter: ['==', ['get', 'type'], 'walking'],
+        minzoom: 14,
+        layout: {
+          visibility: 'none',
+          'symbol-placement': 'line',
+          'symbol-spacing': Math.min(window.innerWidth, window.innerHeight),
+          'text-field': '2-min walk',
+          'text-size': 14,
+          'text-pitch-alignment': 'viewport',
+          'text-anchor': 'bottom',
+        },
+        paint: {
+          'text-color': '#8ab4f8',
+          'text-halo-color': 'rgba(0,0,0,.5)',
+          'text-halo-width': 2,
+        },
+      },
+      'building-extrusion',
+    );
+
+    map.addLayer({
+      id: 'current-location-marker',
+      type: 'circle',
+      source: 'current-location',
+      filter: ['==', ['get', 'type'], 'marker'],
+      layout: {
+        visibility: 'none',
+      },
+      paint: {
+        'circle-radius': 6,
+        'circle-color': '#4285f4',
+        'circle-stroke-width': 3,
+        'circle-stroke-color': '#fff',
+        'circle-pitch-alignment': 'map',
+      },
+    });
+
+    map.addLayer(
+      {
+        id: 'current-location-viewport',
+        type: 'symbol',
+        source: 'current-location',
+        filter: ['==', ['get', 'type'], 'marker'],
+        layout: {
+          visibility: 'none',
+          'icon-ignore-placement': true,
+          'icon-allow-overlap': true,
+          'icon-image': 'location-viewport',
+          'icon-size': 0.5,
+          'icon-anchor': 'bottom',
+          'icon-rotation-alignment': 'map',
+        },
+      },
+      'current-location-marker',
+    );
+
+    setTimeout(() => {
+      map.loadImage(
+        require('url:../assets/location-viewport.png'),
+        (e, image) => {
+          if (e) throw e;
+          map.addImage('location-viewport', image);
+        },
+      );
+    }, 1000);
+
+    $location.style.display = 'block';
+
+    const unwatch = function () {
+      navigator.geolocation.clearWatch(geoWatch);
+      console.log('GEOLOCATION clear watch');
+      watching = sticking = compassing = currentLocation = false;
+
+      [
+        'current-location-accuracy-radius',
+        'current-location-walking-radius',
+        'current-location-walking-radius-label',
+        'current-location-marker',
+        'current-location-viewport',
+      ].forEach((l) => {
+        map.setLayoutProperty(l, 'visibility', 'none', { validate: false });
+      });
+
+      $location.classList.remove('locating', 'active');
+      sessionStorage.removeItem('taxirouter-sg:watch-location');
+      renderTaxisInfo();
+    };
+
+    const unstick = function () {
+      $location.classList.remove('active', 'compass');
+      compassing = false;
+      toCompassing = false;
+      sticking = false;
+      renderTaxisInfo();
+      unstickTimeout = setTimeout(unwatch, 5 * 60 * 1000); // 5 minutes
+    };
+
+    const watch = function () {
+      if (watching) {
+        const bounds = mapboxgl.LngLat.convert(currentLocation).toBounds(
+          walkingDistance,
+        );
+        if (sticking) {
+          if (compassing) {
+            map.stop().fitBounds(bounds, { padding: 50, pitch: 0 });
+          } else {
+            const bearing =
+              map.getLayoutProperty(
+                'current-location-viewport',
+                'icon-rotate',
+              ) || 0;
+            const pitch = map.getPitch();
+            map.stop().easeTo({
+              center: currentLocation,
+              zoom: 18,
+              pitch: pitch >= 45 ? pitch : 60,
+              bearing: bearing,
+            });
+            toCompassing = true;
+            map.once('moveend', () => {
+              toCompassing = false;
+            });
+          }
+          compassing = !compassing;
+          $location.classList.toggle('compass', compassing);
+        } else {
+          map.stop().fitBounds(bounds, { padding: 50, pitch: 0 });
+        }
+        renderTaxisInfo();
+      } else {
+        $location.classList.add('locating');
+        geoWatch = navigator.geolocation.watchPosition(
+          function (position) {
+            $location.classList.remove('locating');
+
+            const coords = position.coords;
+            let lnglat = [coords.longitude, coords.latitude];
+            if (location.hash == '#test-geolocation') {
+              lnglat = [103.843567, 1.28434]; // Chinatown
+            }
+            if ('' + lnglat === '' + currentLocation) return; // No idea why
+
+            currentLocation = lnglat;
+            console.log('GEOLOCATION start watch', currentLocation);
+
+            // Make sure current location is in Singapore first
+            const extendedMaxBounds = maxBounds.extend(currentLocation);
+            if (maxBounds.toString() !== extendedMaxBounds.toString()) {
+              unwatch();
+              return;
+            }
+
+            const radius = coords.accuracy;
+            const accuracyCircle = circle(currentLocation, radius / 1000, {
+              properties: { type: 'accuracy' },
+            });
+            walkingCircle = circle(currentLocation, walkingDistance / 1000, {
+              properties: { type: 'walking' },
+            });
+            map
+              .getSource('current-location')
+              .setData(
+                featureCollection([
+                  accuracyCircle,
+                  walkingCircle,
+                  point(lnglat, { type: 'marker' }),
+                ]),
+              );
+
+            [
+              'current-location-accuracy-radius',
+              'current-location-walking-radius',
+              'current-location-walking-radius-label',
+              'current-location-marker',
+            ].forEach((l) => {
+              map.setLayoutProperty(l, 'visibility', 'visible', {
+                validate: false,
+              });
+            });
+
+            if (!watching) {
+              const bounds = mapboxgl.LngLat.convert(lnglat).toBounds(
+                walkingDistance,
+              );
+              map.fitBounds(bounds, { padding: 50, pitch: 0, animate: false });
+              watching = true;
+              sticking = true;
+              sessionStorage.setItem('taxirouter-sg:watch-location', '1');
+            } else if (sticking && !map.isMoving()) {
+              map.panTo(lnglat);
+            }
+
+            renderTaxisInfo();
+          },
+          function (e) {
+            unwatch();
+            setTimeout(watch, 1000); // Retry watch
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 60 * 1000, // 1 min timeout
+            maximumAge: 5 * 1000, // 5-second cache
+          },
+        );
+      }
+
+      $location.classList.add('active');
+      sticking = true;
+      clearTimeout(unstickTimeout);
+      renderTaxisInfo();
+
+      map.once('dragstart', unstick);
+    };
+
+    function attachOrientation() {
+      // https://developers.google.com/web/updates/2016/03/device-orientation-changes
+      // https://stackoverflow.com/a/47870694/20838
+      const deviceorientation =
+        'ondeviceorientationabsolute' in window
+          ? 'deviceorientationabsolute'
+          : 'deviceorientation';
+      let rafID;
+      window.addEventListener(
+        deviceorientation,
+        function (e) {
+          if (!watching) return;
+          if (!map.getLayer('current-location-viewport')) return;
+          const heading =
+            (e && e.alpha && e.compassHeading) ||
+            e.webkitCompassHeading ||
+            compassHeading(e.alpha, e.beta, e.gamma);
+          if (heading) {
+            cancelAnimationFrame(rafID);
+            rafID = requestAnimationFrame(() => {
+              map.setLayoutProperty(
+                'current-location-viewport',
+                'visibility',
+                'visible',
+                { validate: false },
+              );
+              map.setLayoutProperty(
+                'current-location-viewport',
+                'icon-rotate',
+                heading,
+                { validate: false },
+              );
+              if (compassing && !toCompassing) {
+                map.jumpTo({
+                  center: currentLocation,
+                  bearing: heading,
+                  pitch: Math.min(60, Math.max(0, e.beta)),
+                });
+              }
+            });
+          } else {
+            map.setLayoutProperty(
+              'current-location-viewport',
+              'visibility',
+              'none',
+              { validate: false },
+            );
+          }
+        },
+        false,
+      );
+    }
+
+    let orientationGranted = false;
+    $location.addEventListener(
+      'click',
+      () => {
+        watch();
+        if (window.DeviceOrientationEvent && !orientationGranted) {
+          if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+            DeviceOrientationEvent.requestPermission()
+              .then(function (permissionState) {
+                if (permissionState === 'granted') {
+                  attachOrientation();
+                }
+              })
+              .catch(console.error);
+          } else {
+            attachOrientation();
+          }
+        }
+      },
+      false,
+    );
+
+    // Always show current location
+    if (sessionStorage.getItem('taxirouter-sg:watch-location')) {
+      map.once('idle', watch);
+    }
+  }
+});
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('./sw.js');
+  });
+}

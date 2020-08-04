@@ -1,10 +1,12 @@
-importScripts('https://storage.googleapis.com/workbox-cdn/releases/4.3.1/workbox-sw.js');
+importScripts(
+  'https://storage.googleapis.com/workbox-cdn/releases/5.1.2/workbox-sw.js',
+);
 
 workbox.googleAnalytics.initialize();
 
 workbox.routing.registerRoute(
   /\/([#?].*)?$/,
-  new workbox.strategies.StaleWhileRevalidate({
+  new workbox.strategies.NetworkFirst({
     cacheName: 'index',
   }),
 );
@@ -14,7 +16,7 @@ workbox.routing.registerRoute(
   new workbox.strategies.StaleWhileRevalidate({
     cacheName: 'static-resources',
     plugins: [
-      new workbox.expiration.Plugin({
+      new workbox.expiration.ExpirationPlugin({
         maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
         purgeOnQuotaError: true,
       }),
@@ -27,13 +29,13 @@ workbox.routing.registerRoute(
   new workbox.strategies.CacheFirst({
     cacheName: 'images',
     plugins: [
-      new workbox.expiration.Plugin({
+      new workbox.expiration.ExpirationPlugin({
         maxEntries: 60,
         maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
         purgeOnQuotaError: true,
       }),
-      new workbox.cacheableResponse.Plugin({
-        statuses: [0, 200]
+      new workbox.cacheableResponse.CacheableResponsePlugin({
+        statuses: [0, 200],
       }),
     ],
   }),
@@ -44,12 +46,12 @@ workbox.routing.registerRoute(
   new workbox.strategies.StaleWhileRevalidate({
     cacheName: 'data',
     plugins: [
-      new workbox.expiration.Plugin({
+      new workbox.expiration.ExpirationPlugin({
         maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
         purgeOnQuotaError: true,
       }),
-      new workbox.cacheableResponse.Plugin({
-        statuses: [0, 200]
+      new workbox.cacheableResponse.CacheableResponsePlugin({
+        statuses: [0, 200],
       }),
     ],
   }),
@@ -60,12 +62,12 @@ workbox.routing.registerRoute(
   new workbox.strategies.CacheFirst({
     cacheName: 'mapbox-fonts',
     plugins: [
-      new workbox.expiration.Plugin({
+      new workbox.expiration.ExpirationPlugin({
         maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
         purgeOnQuotaError: true,
       }),
-      new workbox.cacheableResponse.Plugin({
-        statuses: [0, 200]
+      new workbox.cacheableResponse.CacheableResponsePlugin({
+        statuses: [0, 200],
       }),
     ],
   }),
@@ -76,12 +78,12 @@ workbox.routing.registerRoute(
   new workbox.strategies.CacheFirst({
     cacheName: 'mapbox',
     plugins: [
-      new workbox.expiration.Plugin({
+      new workbox.expiration.ExpirationPlugin({
         maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
         purgeOnQuotaError: true,
       }),
-      new workbox.cacheableResponse.Plugin({
-        statuses: [0, 200]
+      new workbox.cacheableResponse.CacheableResponsePlugin({
+        statuses: [0, 200],
       }),
     ],
   }),

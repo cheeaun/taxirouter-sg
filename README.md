@@ -1,7 +1,6 @@
-TaxiRouter SG
-===
+# TaxiRouter SG
 
-![](screenshots/screenshot-2.jpg)
+![](screenshots/screenshot-3.jpg)
 
 **TaxiRouter SG** is a web app that lets you explore available taxis and taxi stands in Singapore. Period.
 
@@ -14,46 +13,37 @@ It has very little number of features:
 
 That's it.
 
-Story
----
+## Story
 
 This project is [first inspired](https://twitter.com/cheeaun/status/710632610607726592) by [@uzyn](https://github.com/uzyn)'s project: [Singapore Taxi Data Visualization](http://uzyn.github.io/taxisg/). Also following up from his talk on FOSS Asia 2016: [Uncovering of an obfuscated public governmental API ](https://speakerdeck.com/uzyn/uncovering-of-an-obfuscated-public-governmental-api-foss-asia-2016). Later, [Data.gov.sg](https://data.gov.sg/) releases a new [taxi availability API](https://developers.data.gov.sg/transport/taxi-availability) and that marks the beginning of this project.
 
-Technicalities
----
+Read more:
 
-Data is from <https://data.gov.sg/>.
+- Building TaxiRouter SG https://cheeaun.com/blog/2016/03/building-taxirouter-sg/
+- Rebuilding TaxiRouter SG https://cheeaun.com/blog/2018/04/rebuilding-taxirouter-sg/
 
-Before `npm i`, install `nss` so that localhost `https` works. Based on [https-localhost](https://github.com/daquinoaldo/https-localhost#dependencies).
+## Bragging
 
-- MacOS
+🎤 I gave [a talk about it](https://engineers.sg/video/taxi-router-talk-js--737) on [Singapore JS Meetup](https://www.meetup.com/Singapore-JS/events/231037529/).
 
-  ``` bash
-  brew install nss
-  ```
+🌟 Featured on [Digital News Asia](https://www.digitalnewsasia.com/digital-economy/datasets-rest-us-datagovsg), [Channel 8 News](https://www.youtube.com/watch?v=8zH8fbUNdKI) and [GovTech conference](https://twitter.com/heliumlife/status/784217428410544128).
 
-- Linux
+## Technicalities
 
-  ``` bash
-  sudo apt install libnss3-tools
-      -or-
-  sudo yum install nss-tools
-      -or-
-  sudo pacman -S nss
-  ```
+### Data
 
-Here's a sprinkle of NPM magic:
+- Download "LTA Taxi Stop" data from https://data.gov.sg/dataset/lta-taxi-stop
+- Run `npm run taxi-stands` to generate `data/taxi-stands.json`, to be used by the web app
+
+### Development
 
 - `npm i` - install everything
-- `npm run taxi-stands` - fetch taxi stands
-- `npm run inliner` - inline all assets from `_index.html` to `index.html`
-- `npm run watch` - watch files and run `inliner` when files changed
-- `npm run serve` - run a local server
-- `npm start` - runs both `watch` and `serve`
+- `npm start` - runs a local development server
+- `npm run start-https` - runs a local development server with HTTPS
+- `npm run build` - builds the production assets for deployment
 
-License
----
+## License
 
-Data is copyrighted by the [Land Transport Authority](http://www.lta.gov.sg/).
+Data: © [Land Transport Authority](http://www.lta.gov.sg/)
 
-Everything else [MIT](http://cheeaun.mit-license.org/).
+Everything else: [MIT](http://cheeaun.mit-license.org/)
