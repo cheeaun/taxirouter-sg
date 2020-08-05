@@ -14,6 +14,34 @@ const point = helpers.point;
 const points = helpers.points;
 const featureCollection = helpers.featureCollection;
 
+const TEST_MODE = location.hash == '#testmode';
+
+const sgPolygon = {
+  type: 'Polygon',
+  coordinates: [
+    [
+      [103.569831, 1.198452],
+      [103.719863, 1.145934],
+      [104.134597, 1.276368],
+      [104.078979, 1.358057],
+      [104.094429, 1.39135],
+      [104.083442, 1.426015],
+      [104.041557, 1.446265],
+      [103.971519, 1.422926],
+      [103.936843, 1.430477],
+      [103.896675, 1.426358],
+      [103.868179, 1.455531],
+      [103.811531, 1.47887],
+      [103.759689, 1.446951],
+      [103.725357, 1.45965],
+      [103.675231, 1.43082],
+      [103.659439, 1.406795],
+      [103.61721, 1.323391],
+      [103.569831, 1.198452],
+    ],
+  ],
+};
+
 function $(id) {
   return document.getElementById(id);
 }
@@ -144,7 +172,7 @@ map.addImage('taxi-stand', $('img-taxi-stand'));
 
 map.once('styledata', () => {
   const layers = map.getStyle().layers;
-  // console.log(layers);
+  console.log(layers);
 
   layers.forEach((l) => {
     const isTrafficLayer = /^traffic/i.test(l.id);
@@ -154,18 +182,21 @@ map.once('styledata', () => {
       return;
     }
 
-    if (
-      l.type === 'symbol' ||
-      l.type === 'line' ||
-      l.type === 'fill-extrusion'
-    ) {
+    // No need `tunnel`, already hidden from source
+    const isRoadLayer = /^(road|bridge)/i.test(l.id);
+    if (isRoadLayer && l.minzoom < 10) {
+      map.setLayerZoomRange(l.id, 10, l.maxzoom);
+    }
+
+    if (l.type === 'symbol' || l.type === 'line') {
       const filter = map.getFilter(l.id);
-      let newFilter = ['==', ['get', 'iso_3166_1'], 'SG'];
+      // within only works for Point or LineString
+      let newFilter = ['within', sgPolygon];
       if (filter) {
         if (filter[0] === 'all') {
-          newFilter = [...filter, ['==', ['get', 'iso_3166_1'], 'SG']];
+          newFilter = [...filter, newFilter];
         } else {
-          newFilter = ['all', ['==', ['get', 'iso_3166_1'], 'SG'], filter];
+          newFilter = ['all', newFilter, filter];
         }
       }
       map.setFilter(l.id, newFilter, { validate: false });
@@ -365,7 +396,9 @@ map.once('load', function () {
           'symbol-placement': 'line',
           'symbol-spacing': Math.min(window.innerWidth, window.innerHeight),
           'text-field': '2-min walk',
+          'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
           'text-size': 14,
+          'text-letter-spacing': 0.1,
           'text-pitch-alignment': 'viewport',
           'text-anchor': 'bottom',
         },
@@ -429,7 +462,12 @@ map.once('load', function () {
     const unwatch = function () {
       navigator.geolocation.clearWatch(geoWatch);
       console.log('GEOLOCATION clear watch');
-      watching = sticking = compassing = currentLocation = false;
+      watching = sticking = compassing = toCompassing = currentLocation = false;
+
+      map.scrollZoom.disable();
+      map.touchZoomRotate.disable();
+      map.scrollZoom.enable();
+      map.touchZoomRotate.enable();
 
       [
         'current-location-accuracy-radius',
@@ -448,9 +486,13 @@ map.once('load', function () {
 
     const unstick = function () {
       $location.classList.remove('active', 'compass');
-      compassing = false;
-      toCompassing = false;
-      sticking = false;
+      compassing = toCompassing = sticking = false;
+
+      map.scrollZoom.disable();
+      map.touchZoomRotate.disable();
+      map.scrollZoom.enable();
+      map.touchZoomRotate.enable();
+
       renderTaxisInfo();
       unstickTimeout = setTimeout(unwatch, 5 * 60 * 1000); // 5 minutes
     };
@@ -489,43 +531,41 @@ map.once('load', function () {
         renderTaxisInfo();
       } else {
         $location.classList.add('locating');
-        geoWatch = navigator.geolocation.watchPosition(
-          function (position) {
-            $location.classList.remove('locating');
+        const currentLocationSource = map.getSource('current-location');
+        let rafID;
 
-            const coords = position.coords;
-            let lnglat = [coords.longitude, coords.latitude];
-            if (location.hash == '#test-geolocation') {
-              lnglat = [103.843567, 1.28434]; // Chinatown
-            }
-            if ('' + lnglat === '' + currentLocation) return; // No idea why
+        function watchPosition(position) {
+          $location.classList.remove('locating');
 
-            currentLocation = lnglat;
-            console.log('GEOLOCATION start watch', currentLocation);
+          const { longitude, latitude, accuracy: radius } = position.coords;
+          let lnglat = [longitude, latitude];
+          if ('' + lnglat === '' + currentLocation) return; // No idea why
 
-            // Make sure current location is in Singapore first
-            const extendedMaxBounds = maxBounds.extend(currentLocation);
-            if (maxBounds.toString() !== extendedMaxBounds.toString()) {
-              unwatch();
-              return;
-            }
+          currentLocation = lnglat;
+          // console.log('CURRENT LOCATION', currentLocation);
 
-            const radius = coords.accuracy;
+          // Make sure current location is in Singapore first
+          const extendedMaxBounds = maxBounds.extend(currentLocation);
+          if (maxBounds.toString() !== extendedMaxBounds.toString()) {
+            unwatch();
+            return;
+          }
+
+          cancelAnimationFrame(rafID);
+          rafID = requestAnimationFrame(() => {
             const accuracyCircle = circle(currentLocation, radius / 1000, {
               properties: { type: 'accuracy' },
             });
             walkingCircle = circle(currentLocation, walkingDistance / 1000, {
               properties: { type: 'walking' },
             });
-            map
-              .getSource('current-location')
-              .setData(
-                featureCollection([
-                  accuracyCircle,
-                  walkingCircle,
-                  point(lnglat, { type: 'marker' }),
-                ]),
-              );
+            currentLocationSource.setData(
+              featureCollection([
+                accuracyCircle,
+                walkingCircle,
+                point(lnglat, { type: 'marker' }),
+              ]),
+            );
 
             [
               'current-location-accuracy-radius',
@@ -556,22 +596,46 @@ map.once('load', function () {
             }
 
             renderTaxisInfo();
-          },
-          function (e) {
-            unwatch();
-            setTimeout(watch, 1000); // Retry watch
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 60 * 1000, // 1 min timeout
-            maximumAge: 5 * 1000, // 5-second cache
-          },
-        );
+          });
+        }
+
+        if (TEST_MODE) {
+          // Chinatown
+          setInterval(() => {
+            const pos = {
+              coords: {
+                longitude: 103.84356 + Math.random() / 10000,
+                latitude: 1.28434 + Math.random() / 10000,
+                accuracy: Math.random() * 100,
+              },
+            };
+            watchPosition(pos);
+          }, 10000);
+        } else {
+          geoWatch = navigator.geolocation.watchPosition(
+            watchPosition,
+            function (e) {
+              unwatch();
+              setTimeout(watch, 1000); // Retry watch
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: 60 * 1000, // 1 min timeout
+              maximumAge: 5 * 1000, // 5-second cache
+            },
+          );
+        }
       }
 
       $location.classList.add('active');
       sticking = true;
       clearTimeout(unstickTimeout);
+
+      map.scrollZoom.disable();
+      map.touchZoomRotate.disable();
+      map.scrollZoom.enable({ around: 'center' });
+      map.touchZoomRotate.enable({ around: 'center' });
+
       renderTaxisInfo();
 
       map.once('dragstart', unstick);
@@ -581,7 +645,7 @@ map.once('load', function () {
       // https://developers.google.com/web/updates/2016/03/device-orientation-changes
       // https://stackoverflow.com/a/47870694/20838
       const deviceorientation =
-        'ondeviceorientationabsolute' in window
+        'ondeviceorientationabsolute' in window && !TEST_MODE // Chrome Dev Tools Sensor doesn't like `deviceorientationabsolute`
           ? 'deviceorientationabsolute'
           : 'deviceorientation';
       let rafID;
@@ -594,6 +658,7 @@ map.once('load', function () {
             (e && e.alpha && e.compassHeading) ||
             e.webkitCompassHeading ||
             compassHeading(e.alpha, e.beta, e.gamma);
+          // console.log('HEADING', heading);
           if (heading) {
             cancelAnimationFrame(rafID);
             rafID = requestAnimationFrame(() => {
@@ -611,7 +676,7 @@ map.once('load', function () {
               );
               if (compassing && !toCompassing) {
                 map.jumpTo({
-                  center: currentLocation,
+                  // center: currentLocation,
                   bearing: heading,
                   pitch: Math.min(60, Math.max(0, e.beta)),
                 });
@@ -659,7 +724,7 @@ map.once('load', function () {
   }
 });
 
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && !TEST_MODE) {
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('./sw.js');
   });
