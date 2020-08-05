@@ -104,8 +104,7 @@ const maxBoundsLike = [
 const maxBounds = mapboxgl.LngLatBounds.convert(maxBoundsLike);
 const map = (window.$map = new mapboxgl.Map({
   container: 'map',
-  style:
-    'mapbox://styles/cheeaun/ckda1ntp40s491iog8ebl4236/draft?optimize=true',
+  style: 'mapbox://styles/cheeaun/ckda1ntp40s491iog8ebl4236?optimize=true',
   boxZoom: false,
   bounds: maxBoundsLike,
   minZoom: 8,
