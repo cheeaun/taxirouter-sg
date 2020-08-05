@@ -543,7 +543,12 @@ map.once('load', function () {
               const bounds = mapboxgl.LngLat.convert(lnglat).toBounds(
                 walkingDistance,
               );
-              map.fitBounds(bounds, { padding: 50, pitch: 0, animate: false });
+              const highZoomLevel = map.getZoom() > 14;
+              map.fitBounds(bounds, {
+                padding: 50,
+                pitch: 0,
+                animate: highZoomLevel,
+              });
               watching = true;
               sticking = true;
               sessionStorage.setItem('taxirouter-sg:watch-location', '1');
