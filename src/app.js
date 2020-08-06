@@ -169,7 +169,7 @@ map.addControl(new PitchControl(), 'top-right');
 
 map.once('styledata', () => {
   const layers = map.getStyle().layers;
-  console.log(layers);
+  // console.log(layers);
 
   layers.forEach((l) => {
     const isTrafficLayer = /^traffic/i.test(l.id);
