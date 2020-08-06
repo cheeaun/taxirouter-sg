@@ -140,32 +140,32 @@ const map = (window.$map = new mapboxgl.Map({
 }));
 map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-function PitchControl() {}
-PitchControl.prototype.onAdd = function (map) {
-  this._map = map;
-  const container = document.createElement('div');
-  container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
-  container.innerHTML =
-    '<button class="mapboxgl-ctrl-icon mapboxgl-ctrl-custom-pitch" type="button"><span>3D</span></button>';
-  container.onclick = function () {
+class PitchControl {
+  onAdd(map) {
+    this._map = map;
+    const container = document.createElement('div');
+    container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
+    container.innerHTML =
+      '<button class="mapboxgl-ctrl-icon mapboxgl-ctrl-custom-pitch" type="button"><span>3D</span></button>';
+    container.onclick = function () {
+      const pitch = map.getPitch();
+      map.easeTo({ pitch: pitch < 10 ? 60 : 0 });
+    };
+    map.on('pitchend', this.onPitch.bind(this));
+    this._container = container;
+    return this._container;
+  }
+  onPitch() {
     const pitch = map.getPitch();
-    map.easeTo({ pitch: pitch < 10 ? 60 : 0 });
-  };
-  map.on('pitchend', this.onPitch.bind(this));
-  this._container = container;
-  return this._container;
-};
-PitchControl.prototype.onPitch = function () {
-  const pitch = map.getPitch();
-  this._container.classList.toggle('active', !!pitch);
-};
-PitchControl.prototype.onRemove = function () {
-  this._container.parentNode.removeChild(this._container);
-  this._map.off('pitchend', this.onPitch.bind(this));
-  this._map = undefined;
-};
+    this._container.classList.toggle('active', !!pitch);
+  }
+  onRemove() {
+    this._container.parentNode.removeChild(this._container);
+    this._map.off('pitchend', this.onPitch.bind(this));
+    this._map = undefined;
+  }
+}
 map.addControl(new PitchControl(), 'top-right');
-
 
 map.once('styledata', () => {
   const layers = map.getStyle().layers;
