@@ -177,18 +177,23 @@ map.once('styledata', () => {
   layers.forEach((l) => {
     const isTrafficLayer = /^traffic/i.test(l.id);
     if (isTrafficLayer) {
-      map.setLayerZoomRange(l.id, 14, 24);
+      map.setLayerZoomRange(l.id, 15, 24);
       map.setLayoutProperty(l.id, 'visibility', 'visible', { validate: false });
       return;
     }
 
     // No need `tunnel`, already hidden from source
-    const isRoadLayer = /^(road|bridge)/i.test(l.id);
+    const isRoadLayer = /^(road|bridge|tunnel)/i.test(l.id);
     if (isRoadLayer && l.minzoom < 10) {
-      map.setLayerZoomRange(l.id, 10, l.maxzoom);
+      const newMinZoom =
+        l.minzoom < 15 ? Math.max(Math.min(16, l.minzoom + 4), 11) : l.minzoom;
+      map.setLayerZoomRange(l.id, newMinZoom, l.maxzoom);
     }
 
-    if (l.type === 'symbol' || l.type === 'line') {
+    if (
+      (l.type === 'symbol' || l.type === 'line') &&
+      l.layout?.visibility !== 'none'
+    ) {
       const filter = map.getFilter(l.id);
       // within only works for Point or LineString
       let newFilter = ['within', sgPolygon];
@@ -262,12 +267,13 @@ map.once('load', function () {
     id: 'taxi-stands',
     type: 'symbol',
     source: 'taxi-stands',
-    minzoom: 16,
+    minzoom: 15,
     layout: {
       'icon-padding': 0,
-      'icon-size': ['interpolate', ['linear'], ['zoom'], 16, 0.5, 22, 1.5],
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 15, 0.25, 18, 1],
       'icon-anchor': 'bottom',
       'icon-image': 'taxi-stand',
+      'icon-allow-overlap': ['step', ['zoom'], false, 16, true],
     },
   });
 
@@ -591,7 +597,7 @@ map.once('load', function () {
               watching = true;
               sticking = true;
               sessionStorage.setItem('taxirouter-sg:watch-location', '1');
-            } else if (sticking && !map.isMoving()) {
+            } else if (sticking) {
               map.panTo(lnglat);
             }
 
