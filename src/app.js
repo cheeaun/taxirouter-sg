@@ -166,9 +166,6 @@ PitchControl.prototype.onRemove = function () {
 };
 map.addControl(new PitchControl(), 'top-right');
 
-map.addImage('taxi', $('img-taxi'));
-map.addImage('taxi-stationary', $('img-taxi-stationary'));
-map.addImage('taxi-stand', $('img-taxi-stand'));
 
 map.once('styledata', () => {
   const layers = map.getStyle().layers;
@@ -276,6 +273,12 @@ map.once('load', function () {
       'icon-allow-overlap': ['step', ['zoom'], false, 16, true],
     },
   });
+
+  setTimeout(() => {
+    map.addImage('taxi', $('img-taxi'));
+    map.addImage('taxi-stationary', $('img-taxi-stationary'));
+    map.addImage('taxi-stand', $('img-taxi-stand'));
+  }, 300);
 
   let sticking = false;
   let watching = false;
