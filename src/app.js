@@ -51,6 +51,11 @@ function numberWithCommas(x) {
   return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
+function round(num, precision = 6) {
+  const multiplier = Math.pow(10, precision || 0);
+  return Math.round(num * multiplier) / multiplier;
+}
+
 // https://stackoverflow.com/a/21829819/20838
 // http://w3c.github.io/deviceorientation/spec-source-orientation.html#worked-example
 const degtorad = Math.PI / 180; // Degree-to-Radian conversion
@@ -283,7 +288,7 @@ map.once('load', function () {
   let sticking = false;
   let watching = false;
   let compassing = false;
-  let toCompassing = false;
+  let compassingTransition = false; // The transition duration when switching from watching to compassing
   let geoWatch;
   let unstickTimeout;
 
@@ -464,14 +469,14 @@ map.once('load', function () {
           map.addImage('location-viewport', image);
         },
       );
-    }, 1000);
+    }, 300);
 
     $location.style.display = 'block';
 
     const unwatch = function () {
       navigator.geolocation.clearWatch(geoWatch);
       console.log('GEOLOCATION clear watch');
-      watching = sticking = compassing = toCompassing = currentLocation = false;
+      watching = sticking = compassing = compassingTransition = currentLocation = false;
 
       map.scrollZoom.disable();
       map.touchZoomRotate.disable();
@@ -495,7 +500,7 @@ map.once('load', function () {
 
     const unstick = function () {
       $location.classList.remove('active', 'compass');
-      compassing = toCompassing = sticking = false;
+      compassing = compassingTransition = sticking = false;
 
       map.scrollZoom.disable();
       map.touchZoomRotate.disable();
@@ -505,6 +510,11 @@ map.once('load', function () {
       renderTaxisInfo();
       unstickTimeout = setTimeout(unwatch, 5 * 60 * 1000); // 5 minutes
     };
+    map.on('dragstart', (e) => {
+      if (!e.originalEvent) return;
+      const { touches } = e.originalEvent;
+      if (touches.length === 1) unstick();
+    });
 
     const watch = function () {
       if (watching) {
@@ -512,6 +522,7 @@ map.once('load', function () {
           walkingDistance,
         );
         if (sticking) {
+          compassingTransition = true;
           if (compassing) {
             map.stop().fitBounds(bounds, { padding: 50, pitch: 0 });
           } else {
@@ -527,11 +538,10 @@ map.once('load', function () {
               pitch: pitch >= 45 ? pitch : 60,
               bearing: bearing,
             });
-            toCompassing = true;
-            map.once('moveend', () => {
-              toCompassing = false;
-            });
           }
+          map.once('moveend', () => {
+            compassingTransition = false;
+          });
           compassing = !compassing;
           $location.classList.toggle('compass', compassing);
         } else {
@@ -646,11 +656,22 @@ map.once('load', function () {
       map.touchZoomRotate.enable({ around: 'center' });
 
       renderTaxisInfo();
-
-      map.once('dragstart', unstick);
     };
 
     function attachOrientation() {
+      let touchingMap = false;
+      map.on('touchstart', (e) => {
+        if (e.originalEvent) {
+          touchingMap = true;
+        }
+      });
+      map.on('touchend', () => {
+        touchingMap = false;
+      });
+      map.on('touchcancel', () => {
+        touchingMap = false;
+      });
+
       // https://developers.google.com/web/updates/2016/03/device-orientation-changes
       // https://stackoverflow.com/a/47870694/20838
       const deviceorientation =
@@ -658,17 +679,26 @@ map.once('load', function () {
           ? 'deviceorientationabsolute'
           : 'deviceorientation';
       let rafID;
+      let prevBearing;
+      let prevPitch;
       window.addEventListener(
         deviceorientation,
         function (e) {
           if (!watching) return;
+          if (touchingMap) return;
           if (!map.getLayer('current-location-viewport')) return;
-          const heading =
+          const bearing = round(
             (e && e.alpha && e.compassHeading) ||
-            e.webkitCompassHeading ||
-            compassHeading(e.alpha, e.beta, e.gamma);
-          // console.log('HEADING', heading);
-          if (heading) {
+              e.webkitCompassHeading ||
+              compassHeading(e.alpha, e.beta, e.gamma),
+            1,
+          );
+          const pitch = round(Math.min(60, Math.max(0, e.beta)), 1);
+          if (bearing) {
+            if (bearing === prevBearing && pitch === prevPitch) return;
+            prevBearing = bearing;
+            prevPitch = pitch;
+            // console.log('BEARING + PITCH', bearing, pitch);
             cancelAnimationFrame(rafID);
             rafID = requestAnimationFrame(() => {
               map.setLayoutProperty(
@@ -680,14 +710,14 @@ map.once('load', function () {
               map.setLayoutProperty(
                 'current-location-viewport',
                 'icon-rotate',
-                heading,
+                bearing,
                 { validate: false },
               );
-              if (compassing && !toCompassing) {
+              if (compassing && !compassingTransition) {
                 map.jumpTo({
                   // center: currentLocation,
-                  bearing: heading,
-                  pitch: Math.min(60, Math.max(0, e.beta)),
+                  bearing,
+                  pitch,
                 });
               }
             });
