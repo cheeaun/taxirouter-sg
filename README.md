@@ -33,7 +33,8 @@ Read more:
 ### Data
 
 - Download "LTA Taxi Stop" data from https://data.gov.sg/dataset/lta-taxi-stop
-- Run `npm run taxi-stands` to generate `data/taxi-stands.json`, to be used by the web app
+- Extract the GeoJSON file to `data/lta-taxi-stop-geojson.geojson` (assuming the file name is still the same).
+- Run `npm run taxi-stands` to (re)generate `data/taxi-stands.json`, to be used by the web app
 
 ### Development
 
