@@ -475,7 +475,7 @@ map.once('load', function () {
 
     const unwatch = function () {
       navigator.geolocation.clearWatch(geoWatch);
-      console.log('GEOLOCATION clear watch');
+      // console.log('GEOLOCATION clear watch');
       watching = sticking = compassing = compassingTransition = currentLocation = false;
 
       map.scrollZoom.disable();
