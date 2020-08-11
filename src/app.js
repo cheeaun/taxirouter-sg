@@ -513,7 +513,11 @@ map.once('load', function () {
     map.on('dragstart', (e) => {
       if (!e.originalEvent) return;
       const { touches } = e.originalEvent;
-      if (touches.length === 1) unstick();
+      if (touches) {
+        if (touches.length === 1) unstick();
+      } else {
+        unstick();
+      }
     });
 
     const watch = function () {
