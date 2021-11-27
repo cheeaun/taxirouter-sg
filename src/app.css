@@ -338,3 +338,7 @@ header svg {
   background: linear-gradient(to bottom, rgba(66, 133, 244, 0), #4285f4 30%);
   clip-path: polygon(25% 0, 75% 0, 50% 50%);
 }
+
+.mapboxgl-ctrl {
+  box-sizing: content-box;
+}
