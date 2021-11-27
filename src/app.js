@@ -376,7 +376,7 @@ map.once('load', function () {
         // });
       });
 
-      // setTimeout(renderTaxis, 1000 * 60); // every minute
+      setTimeout(renderTaxis, 1000 * 60); // every minute
     });
   };
   renderTaxis();
