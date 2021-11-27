@@ -17,15 +17,27 @@
     "taxi-stands": "node scripts/fetch-taxi-stands.js"
   },
   "dependencies": {
-    "@turf/circle": "~6.0.1",
-    "@turf/helpers": "~6.1.4",
-    "@turf/nearest-point": "~6.0.1",
-    "@turf/points-within-polygon": "~5.1.5",
-    "mapbox-gl": "~1.11.1",
-    "regenerator-runtime": "~0.13.7"
+    "@deck.gl/core": "~8.6.4",
+    "@deck.gl/layers": "~8.6.4",
+    "@deck.gl/mapbox": "~8.6.4",
+    "@deck.gl/mesh-layers": "~8.6.4",
+    "@loaders.gl/core": "~3.0.13",
+    "@loaders.gl/draco": "~3.0.13",
+    "@loaders.gl/gltf": "~3.0.13",
+    "@loaders.gl/obj": "~3.0.13",
+    "@luma.gl/core": "~8.5.10",
+    "@turf/circle": "~6.5.0",
+    "@turf/helpers": "~6.5.0",
+    "@turf/nearest-point": "~6.5.0",
+    "@turf/points-within-polygon": "~6.5.0",
+    "cheap-ruler": "~3.0.1",
+    "geokdbush": "~1.1.0",
+    "kdbush": "~3.0.0",
+    "mapbox-gl": "~2.6.1",
+    "regenerator-runtime": "~0.13.9"
   },
   "devDependencies": {
     "cpy-cli": "~3.1.1",
-    "parcel": "~2.0.0-beta.1"
+    "parcel": "~2.0.1"
   }
 }

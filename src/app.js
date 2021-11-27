@@ -3,16 +3,13 @@ import 'regenerator-runtime/runtime';
 
 const mapboxgl = require('mapbox-gl');
 
-const taxiStandsOnMap = require('url:../data/taxi-stands.json');
+const taxiStandsOnMap = require('../data/taxi-stands.json');
 
 const helpers = require('@turf/helpers');
 const pointsWithinPolygon = require('@turf/points-within-polygon').default;
 const nearestPoint = require('@turf/nearest-point').default;
 const circle = require('@turf/circle').default;
-const multiPoint = helpers.multiPoint;
-const point = helpers.point;
-const points = helpers.points;
-const featureCollection = helpers.featureCollection;
+const { featureCollection, multiPoint, point } = helpers;
 
 const TEST_MODE = location.hash == '#testmode';
 
@@ -141,6 +138,7 @@ const map = (window.$map = new mapboxgl.Map({
   boxZoom: false,
   bounds: maxBoundsLike,
   minZoom: 8,
+  maxZoom: 19,
   renderWorldCopies: false,
 }));
 map.addControl(new mapboxgl.NavigationControl(), 'top-right');
@@ -162,7 +160,7 @@ class PitchControl {
   }
   onPitch() {
     const pitch = map.getPitch();
-    this._container.classList.toggle('active', !!pitch);
+    this._container.classList.toggle('active', pitch >= 10);
   }
   onRemove() {
     this._container.parentNode.removeChild(this._container);
@@ -171,6 +169,16 @@ class PitchControl {
   }
 }
 map.addControl(new PitchControl(), 'top-right');
+
+let ThreeDTaxi;
+// if (true) {
+//   import('./3d-taxi.js').then((layer) => {
+//     ThreeDTaxi = layer;
+//     map.once('idle', () => {
+//       ThreeDTaxi.render(map);
+//     });
+//   });
+// }
 
 map.once('styledata', () => {
   const layers = map.getStyle().layers;
@@ -220,25 +228,32 @@ map.once('load', function () {
   // );
 
   map.addSource('taxis', emptyGeojson);
-  map.addLayer({
-    id: 'taxis',
-    type: 'symbol',
-    source: 'taxis',
-    minzoom: 10,
-    layout: {
-      'icon-padding': 1,
-      'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.1, 18, 1],
-      // 'icon-ignore-placement': true,
-      'icon-allow-overlap': true,
-      'icon-image': [
-        'case',
-        ['to-boolean', ['get', 'stationary']],
-        'taxi-stationary',
-        'taxi',
-      ],
-      'symbol-sort-key': ['case', ['to-boolean', ['get', 'stationary']], 1, 2],
-    },
-  });
+  if (!ThreeDTaxi) {
+    map.addLayer({
+      id: 'taxis',
+      type: 'symbol',
+      source: 'taxis',
+      minzoom: 10,
+      layout: {
+        'icon-padding': 1,
+        'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.1, 18, 1],
+        'icon-ignore-placement': true,
+        'icon-allow-overlap': true,
+        'icon-image': [
+          'case',
+          ['to-boolean', ['get', 'stationary']],
+          'taxi-stationary',
+          'taxi',
+        ],
+        'symbol-sort-key': [
+          'case',
+          ['to-boolean', ['get', 'stationary']],
+          1,
+          2,
+        ],
+      },
+    });
+  }
   map.addLayer({
     id: 'taxis-heat',
     type: 'heatmap',
@@ -294,14 +309,14 @@ map.once('load', function () {
 
   const renderTaxisInfo = function () {
     $infoTaxis.className = 'loaded';
-    if (currentLocation && sticking) {
+    if (currentLocation && sticking && walkingCircle) {
       const taxiCountAround = pointsWithinPolygon(
-        points(taxisOnMap.features[0].geometry.coordinates),
+        multiPoint(taxisOnMap.features[0].geometry.coordinates),
         walkingCircle,
       ).features.length;
       const nearestTaxiStand = nearestPoint(
         point(currentLocation),
-        points(taxiStandsOnMap),
+        featureCollection(taxiStandsOnMap.map((s) => point(s))),
       );
       if (taxiCountAround) {
         $infoTaxis.innerHTML =
@@ -320,7 +335,7 @@ map.once('load', function () {
             '</b> walk&nbsp;away.';
         }
       }
-    } else {
+    } else if (taxisOnMap) {
       const taxiCount = taxisOnMap.features[0].properties.taxi_count;
       $infoTaxis.innerHTML =
         '<b>' + numberWithCommas(taxiCount) + '</b> available taxis!';
@@ -332,7 +347,8 @@ map.once('load', function () {
       $infoTaxis.className = '';
       fetchTaxis(function (data) {
         if (taxisOnMap) {
-          const taxisOnMapStr = taxisOnMap.features[0].geometry.coordinates.toString();
+          const taxisOnMapStr =
+            taxisOnMap.features[0].geometry.coordinates.toString();
           const stationaryTaxis = [];
           const movingTaxis = [];
           const { coordinates } = data.features[0].geometry;
@@ -355,14 +371,28 @@ map.once('load', function () {
         }
         taxisOnMap = data;
         renderTaxisInfo();
+        // requestAnimationFrame(() => {
+        //   ThreeDTaxi?.setData(map, data);
+        // });
       });
 
-      setTimeout(renderTaxis, 1000 * 60); // every minute
+      // setTimeout(renderTaxis, 1000 * 60); // every minute
     });
   };
   renderTaxis();
 
   if (navigator.geolocation) {
+    const currentLocationElement = document.createElement('div');
+    currentLocationElement.id = 'current-location';
+    currentLocationElement.innerHTML =
+      '<div id="current-location-circle"></div><div id="current-location-viewport" hidden></div>';
+    const currentLocationMarker = new mapboxgl.Marker({
+      element: currentLocationElement,
+      rotationAlignment: 'map',
+    })
+      .setLngLat([30.5, 50.5])
+      .addTo(map);
+
     map.addSource('current-location', emptyGeojson);
     map.addLayer({
       id: 'current-location-accuracy-radius',
@@ -425,58 +455,53 @@ map.once('load', function () {
       'building-extrusion',
     );
 
-    map.addLayer({
-      id: 'current-location-marker',
-      type: 'circle',
-      source: 'current-location',
-      filter: ['==', ['get', 'type'], 'marker'],
-      layout: {
-        visibility: 'none',
-      },
-      paint: {
-        'circle-radius': 6,
-        'circle-color': '#4285f4',
-        'circle-stroke-width': 3,
-        'circle-stroke-color': '#fff',
-        'circle-pitch-alignment': 'map',
-      },
-    });
+    // map.addLayer({
+    //   id: 'current-location-marker',
+    //   type: 'circle',
+    //   source: 'current-location',
+    //   filter: ['==', ['get', 'type'], 'marker'],
+    //   layout: {
+    //     visibility: 'none',
+    //   },
+    //   paint: {
+    //     'circle-radius': 6,
+    //     'circle-color': '#4285f4',
+    //     'circle-stroke-width': 3,
+    //     'circle-stroke-color': '#fff',
+    //     'circle-pitch-alignment': 'map',
+    //   },
+    // });
 
-    map.addLayer(
-      {
-        id: 'current-location-viewport',
-        type: 'symbol',
-        source: 'current-location',
-        filter: ['==', ['get', 'type'], 'marker'],
-        layout: {
-          visibility: 'none',
-          'icon-ignore-placement': true,
-          'icon-allow-overlap': true,
-          'icon-image': 'location-viewport',
-          'icon-size': 0.5,
-          'icon-anchor': 'bottom',
-          'icon-rotation-alignment': 'map',
-        },
-      },
-      'current-location-marker',
-    );
-
-    setTimeout(() => {
-      map.loadImage(
-        require('url:../assets/location-viewport.png'),
-        (e, image) => {
-          if (e) throw e;
-          map.addImage('location-viewport', image);
-        },
-      );
-    }, 300);
+    // map.addLayer(
+    //   {
+    //     id: 'current-location-viewport',
+    //     type: 'symbol',
+    //     source: 'current-location',
+    //     filter: ['==', ['get', 'type'], 'marker'],
+    //     layout: {
+    //       visibility: 'none',
+    //       'icon-ignore-placement': true,
+    //       'icon-allow-overlap': true,
+    //       'icon-image': 'location-viewport',
+    //       'icon-size': 0.5,
+    //       'icon-anchor': 'bottom',
+    //       'icon-rotation-alignment': 'map',
+    //     },
+    //   },
+    //   'current-location-marker',
+    // );
 
     $location.style.display = 'block';
 
     const unwatch = function () {
       navigator.geolocation.clearWatch(geoWatch);
       // console.log('GEOLOCATION clear watch');
-      watching = sticking = compassing = compassingTransition = currentLocation = false;
+      watching =
+        sticking =
+        compassing =
+        compassingTransition =
+        currentLocation =
+          false;
 
       map.scrollZoom.disable();
       map.touchZoomRotate.disable();
@@ -487,11 +512,12 @@ map.once('load', function () {
         'current-location-accuracy-radius',
         'current-location-walking-radius',
         'current-location-walking-radius-label',
-        'current-location-marker',
-        'current-location-viewport',
+        // 'current-location-marker',
+        // 'current-location-viewport',
       ].forEach((l) => {
         map.setLayoutProperty(l, 'visibility', 'none', { validate: false });
       });
+      currentLocationMarker.remove();
 
       $location.classList.remove('locating', 'active');
       sessionStorage.removeItem('taxirouter-sg:watch-location');
@@ -522,24 +548,26 @@ map.once('load', function () {
 
     const watch = function () {
       if (watching) {
-        const bounds = mapboxgl.LngLat.convert(currentLocation).toBounds(
-          walkingDistance,
-        );
+        const bounds =
+          mapboxgl.LngLat.convert(currentLocation).toBounds(walkingDistance);
         if (sticking) {
           compassingTransition = true;
           if (compassing) {
             map.stop().fitBounds(bounds, { padding: 50, pitch: 0 });
           } else {
-            const bearing =
-              map.getLayoutProperty(
-                'current-location-viewport',
-                'icon-rotate',
-              ) || 0;
+            // const bearing =
+            //   map.getLayoutProperty(
+            //     'current-location-viewport',
+            //     'icon-rotate',
+            //   ) || 0;
+            const bearing = currentLocationMarker.getRotation();
+            const currentPitch = currentLocationMarker._pitch;
+            console.log({ currentPitch });
             const pitch = map.getPitch();
             map.stop().easeTo({
               center: currentLocation,
               zoom: 18,
-              pitch: pitch >= 45 ? pitch : 60,
+              pitch: currentPitch || (pitch >= 45 ? pitch : 60),
               bearing: bearing,
             });
           }
@@ -586,25 +614,26 @@ map.once('load', function () {
               featureCollection([
                 accuracyCircle,
                 walkingCircle,
-                point(lnglat, { type: 'marker' }),
+                // point(lnglat, { type: 'marker' }),
               ]),
             );
+            currentLocationMarker.setLngLat(lnglat);
 
             [
               'current-location-accuracy-radius',
               'current-location-walking-radius',
               'current-location-walking-radius-label',
-              'current-location-marker',
+              // 'current-location-marker',
             ].forEach((l) => {
               map.setLayoutProperty(l, 'visibility', 'visible', {
                 validate: false,
               });
+              currentLocationMarker.addTo(map);
             });
 
             if (!watching) {
-              const bounds = mapboxgl.LngLat.convert(lnglat).toBounds(
-                walkingDistance,
-              );
+              const bounds =
+                mapboxgl.LngLat.convert(lnglat).toBounds(walkingDistance);
               const highZoomLevel = map.getZoom() > 14;
               map.fitBounds(bounds, {
                 padding: 50,
@@ -624,16 +653,24 @@ map.once('load', function () {
 
         if (TEST_MODE) {
           // Chinatown
-          setInterval(() => {
-            const pos = {
-              coords: {
-                longitude: 103.84356 + Math.random() / 10000,
-                latitude: 1.28434 + Math.random() / 10000,
-                accuracy: Math.random() * 100,
-              },
-            };
-            watchPosition(pos);
-          }, 10000);
+          const pos = {
+            coords: {
+              longitude: 103.84356 + Math.random() / 10000,
+              latitude: 1.28434 + Math.random() / 10000,
+              accuracy: Math.random() * 100,
+            },
+          };
+          watchPosition(pos);
+          // setInterval(() => {
+          //   const pos = {
+          //     coords: {
+          //       longitude: 103.84356 + Math.random() / 10000,
+          //       latitude: 1.28434 + Math.random() / 10000,
+          //       accuracy: Math.random() * 100,
+          //     },
+          //   };
+          //   watchPosition(pos);
+          // }, 10000);
         } else {
           geoWatch = navigator.geolocation.watchPosition(
             watchPosition,
@@ -690,7 +727,6 @@ map.once('load', function () {
         function (e) {
           if (!watching) return;
           if (touchingMap) return;
-          if (!map.getLayer('current-location-viewport')) return;
           const bearing = round(
             (e && e.alpha && e.compassHeading) ||
               e.webkitCompassHeading ||
@@ -698,6 +734,7 @@ map.once('load', function () {
             1,
           );
           const pitch = round(Math.min(60, Math.max(0, e.beta)), 1);
+          currentLocationMarker._pitch = pitch;
           if (bearing) {
             if (bearing === prevBearing && pitch === prevPitch) return;
             prevBearing = bearing;
@@ -705,19 +742,24 @@ map.once('load', function () {
             // console.log('BEARING + PITCH', bearing, pitch);
             cancelAnimationFrame(rafID);
             rafID = requestAnimationFrame(() => {
-              map.setLayoutProperty(
-                'current-location-viewport',
-                'visibility',
-                'visible',
-                { validate: false },
-              );
-              map.setLayoutProperty(
-                'current-location-viewport',
-                'icon-rotate',
-                bearing,
-                { validate: false },
-              );
+              // map.setLayoutProperty(
+              //   'current-location-viewport',
+              //   'visibility',
+              //   'visible',
+              //   { validate: false },
+              // );
+              // map.setLayoutProperty(
+              //   'current-location-viewport',
+              //   'icon-rotate',
+              //   bearing,
+              //   { validate: false },
+              // );
+              currentLocationMarker
+                .getElement()
+                .querySelector('#current-location-viewport').hidden = false;
+              currentLocationMarker.setRotation(bearing);
               if (compassing && !compassingTransition) {
+                map.triggerRepaint();
                 map.jumpTo({
                   // center: currentLocation,
                   bearing,
@@ -726,12 +768,15 @@ map.once('load', function () {
               }
             });
           } else {
-            map.setLayoutProperty(
-              'current-location-viewport',
-              'visibility',
-              'none',
-              { validate: false },
-            );
+            currentLocationMarker
+              .getElement()
+              .querySelector('#current-location-viewport').hidden = true;
+            // map.setLayoutProperty(
+            //   'current-location-viewport',
+            //   'visibility',
+            //   'none',
+            //   { validate: false },
+            // );
           }
         },
         false,
@@ -739,36 +784,42 @@ map.once('load', function () {
     }
 
     let orientationGranted = false;
+    function orientate() {
+      if (window.DeviceOrientationEvent && !orientationGranted) {
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+          DeviceOrientationEvent.requestPermission()
+            .then(function (permissionState) {
+              if (permissionState === 'granted') {
+                attachOrientation();
+              }
+            })
+            .catch(console.error);
+        } else {
+          attachOrientation();
+        }
+      }
+    }
     $location.addEventListener(
       'click',
       () => {
         watch();
-        if (window.DeviceOrientationEvent && !orientationGranted) {
-          if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-            DeviceOrientationEvent.requestPermission()
-              .then(function (permissionState) {
-                if (permissionState === 'granted') {
-                  attachOrientation();
-                }
-              })
-              .catch(console.error);
-          } else {
-            attachOrientation();
-          }
-        }
+        orientate();
       },
       false,
     );
 
     // Always show current location
     if (sessionStorage.getItem('taxirouter-sg:watch-location')) {
-      map.once('idle', watch);
+      map.once('idle', () => {
+        watch();
+        orientate();
+      });
     }
   }
 });
 
 if ('serviceWorker' in navigator && !TEST_MODE) {
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('./sw.js');
+    navigator.serviceWorker.register(new URL('./sw.js', import.meta.url));
   });
 }
