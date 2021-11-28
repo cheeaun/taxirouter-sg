@@ -234,6 +234,14 @@ map.once('load', function () {
       type: 'symbol',
       source: 'taxis',
       minzoom: 10,
+      filter: [
+        'case',
+        ['<', ['pitch'], 65],
+        true,
+        ['all', ['>=', ['pitch'], 65], ['<', ['distance-from-center'], 3]],
+        true,
+        false,
+      ],
       layout: {
         'icon-padding': 1,
         'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.1, 18, 1],
