@@ -397,9 +397,9 @@ map.once('load', function () {
     const currentLocationMarker = new mapboxgl.Marker({
       element: currentLocationElement,
       rotationAlignment: 'map',
-    })
-      .setLngLat([30.5, 50.5])
-      .addTo(map);
+    });
+    // .setLngLat([30.5, 50.5])
+    // .addTo(map);
 
     map.addSource('current-location', emptyGeojson);
     map.addLayer({
@@ -625,7 +625,7 @@ map.once('load', function () {
                 // point(lnglat, { type: 'marker' }),
               ]),
             );
-            currentLocationMarker.setLngLat(lnglat);
+            currentLocationMarker.setLngLat(lnglat).addTo(map);
 
             [
               'current-location-accuracy-radius',
@@ -636,7 +636,6 @@ map.once('load', function () {
               map.setLayoutProperty(l, 'visibility', 'visible', {
                 validate: false,
               });
-              currentLocationMarker.addTo(map);
             });
 
             if (!watching) {
