@@ -733,7 +733,7 @@ map.once('load', function () {
               compassHeading(e.alpha, e.beta, e.gamma),
             1,
           );
-          const pitch = round(Math.min(60, Math.max(0, e.beta)), 1);
+          const pitch = round(Math.min(85, Math.max(0, e.beta)), 1);
           currentLocationMarker._pitch = pitch;
           if (bearing) {
             if (bearing === prevBearing && pitch === prevPitch) return;
