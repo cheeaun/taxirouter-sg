@@ -115,7 +115,7 @@ if (window.localStorage && !localStorage.getItem('taxirouter-sg:about')) {
 let firstFetch = true;
 function fetchTaxis(fn) {
   fetch(
-    'https://api.data.gov.sg/v1/transport/taxi-availability' +
+    'https://taxi-availability.cheeaun.workers.dev/' +
       (firstFetch ? '' : '?' + +new Date()),
   )
     .then(function (res) {
