@@ -1,21 +1,5 @@
 {
   "extends": "@parcel/config-default",
-  "bundler": {
-    "plugin": "@parcel/bundler-default",
-    "config": {
-      "manualSharedBundles": [
-        {
-          "name": "mapbox-core",
-          "assets": [
-            "node_modules/mapbox-gl/dist/esm/mapbox-gl.js",
-            "node_modules/mapbox-gl/dist/esm/core.js",
-            "node_modules/mapbox-gl/dist/esm/shared.js"
-          ],
-          "types": ["js"]
-        }
-      ]
-    }
-  },
   "transformers": {
     "*.html": [
       {

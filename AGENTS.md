@@ -35,7 +35,7 @@ TaxiRouter SG is a web app for exploring available taxis and taxi stands in Sing
 - `data/taxi-stands.json` — array of `[lng, lat]` pairs consumed by the app
 - `scripts/fetch-taxi-stands.js` — fetches taxi stands from the data.gov.sg API
 - `public/` — static files copied into `dist` at build time (CNAME, favicon)
-- `.parcelrc` — Parcel config: disables SVG minification and puts mapbox-gl's ESM core/shared chunks into a `manualSharedBundles` vendor bundle; the rest of its rendering modules stay as lazy chunks
+- `.parcelrc` — Parcel config: disables SVG minification (HTML transformer options)
 
 ## Conventions and gotchas
 
@@ -44,7 +44,8 @@ TaxiRouter SG is a web app for exploring available taxis and taxi stands in Sing
 - Parcel 3 removed `--no-cache`, `--no-autoinstall`, and on-disk caching. Do not reintroduce them.
 - `.htmlnanorc` is no longer supported; HTML transformer options live in `.parcelrc`.
 - Import Mapbox GL from its ESM entry (`import * as mapboxgl from 'mapbox-gl/esm'`) and set the token with `mapboxgl.setAccessToken(...)`. The namespace object is sealed, so assigning `mapboxgl.accessToken` throws. The ESM build lazy-loads its 3D/environment/high-detail renderer modules based on the style.
-- The `~2 MB` build warning is almost entirely mapbox-gl's core/shared vendor bundle. It is expected; serve assets with gzip/brotli. `manualSharedBundles` keeps the app chunk small so mapbox stays cached separately, while Parcel still emits the per-module lazy chunks.
+- The `~1.4 MB` app chunk warning is nearly all mapbox-gl's core/shared code. It is expected; serve assets with gzip/brotli.
+- Do not add `manualSharedBundles` for mapbox-gl. In Parcel 3 alpha, splitting `core.js`/`shared.js` into a shared vendor bundle makes the lazy renderer chunks (and the map worker) re-use a duplicate module instance, so `type: 'model'` layers silently draw nothing in production builds — the GLB still loads and `map.listModels()` reports it, which makes this easy to misdiagnose. Verify 3D taxis with a production build, not just `npm start`.
 - There is no test suite or linter configured. Verify changes with `npm run build` and by loading the app in a browser.
 
 ## Deployment
