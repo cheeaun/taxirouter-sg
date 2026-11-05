@@ -15,6 +15,7 @@ let taxiCoordinates = [];
 let layerAdded = false;
 let modelAdded = false;
 let stationaryKeys = new Set();
+let needsRetry = false;
 const bearingCache = new Map();
 
 function stableBearing([lng, lat]) {
@@ -156,6 +157,7 @@ function update() {
 
   if (!is3D) return;
 
+  needsRetry = false;
   const center = map.getCenter();
   const refLng = center.lng;
   const refLat = center.lat;
@@ -200,8 +202,13 @@ function update() {
       bearing = cached.bearing;
     } else if (p.inView) {
       bearing = nearestBearing(grid, p.x, p.y);
-      if (bearing == null) bearing = stableBearing(p.c);
-      bearingCache.set(p.key, { bearing, tier });
+      if (bearing == null) {
+        bearing = stableBearing(p.c);
+        bearingCache.delete(p.key);
+        needsRetry = true;
+      } else {
+        bearingCache.set(p.key, { bearing, tier });
+      }
     } else if (cached) {
       bearing = cached.bearing;
     } else {
@@ -310,6 +317,10 @@ export function render(m) {
 
   layerAdded = true;
   map.on('moveend', update);
+  map.on('sourcedata', (e) => {
+    if (!needsRetry) return;
+    if (e.sourceId === 'composite' && e.isSourceLoaded) update();
+  });
   update();
 }
 
