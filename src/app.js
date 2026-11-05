@@ -1,7 +1,6 @@
 import taxiStandsOnMap from '../data/taxi-stands.json';
 import * as ThreeDTaxi from './3d-taxi.js';
-
-const mapboxgl = require('mapbox-gl');
+import * as mapboxgl from 'mapbox-gl/esm';
 
 const helpers = require('@turf/helpers');
 const pointsWithinPolygon = require('@turf/points-within-polygon').default;
@@ -123,8 +122,9 @@ function fetchTaxis(fn) {
   firstFetch = false;
 }
 
-mapboxgl.accessToken =
-  'pk.eyJ1IjoiY2hlZWF1biIsImEiOiJjam95aHNtajAyYng2M3FrZm96Mjd4MDlzIn0.O0ulrgNkC_GiuqN8q-Mhog';
+mapboxgl.setAccessToken(
+  'pk.eyJ1IjoiY2hlZWF1biIsImEiOiJjam95aHNtajAyYng2M3FrZm96Mjd4MDlzIn0.O0ulrgNkC_GiuqN8q-Mhog',
+);
 const maxBoundsLike = [
   [103.6017, 1.2334], // sw
   [104.0381, 1.4738], // ne

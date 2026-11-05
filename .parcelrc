@@ -5,7 +5,13 @@
     "config": {
       "manualSharedBundles": [
         {
-          "assets": ["node_modules/**"]
+          "name": "mapbox-core",
+          "assets": [
+            "node_modules/mapbox-gl/dist/esm/mapbox-gl.js",
+            "node_modules/mapbox-gl/dist/esm/core.js",
+            "node_modules/mapbox-gl/dist/esm/shared.js"
+          ],
+          "types": ["js"]
         }
       ]
     }
