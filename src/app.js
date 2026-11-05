@@ -1,9 +1,6 @@
-// https://github.com/parcel-bundler/parcel/issues/3375#issuecomment-599160200
-import 'regenerator-runtime/runtime';
+import taxiStandsOnMap from '../data/taxi-stands.json';
 
 const mapboxgl = require('mapbox-gl');
-
-const taxiStandsOnMap = require('../data/taxi-stands.json');
 
 const helpers = require('@turf/helpers');
 const pointsWithinPolygon = require('@turf/points-within-polygon').default;

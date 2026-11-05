@@ -1,0 +1,25 @@
+{
+  "extends": "@parcel/config-default",
+  "bundler": {
+    "plugin": "@parcel/bundler-default",
+    "config": {
+      "manualSharedBundles": [
+        {
+          "assets": ["node_modules/**"]
+        }
+      ]
+    }
+  },
+  "transformers": {
+    "*.html": [
+      {
+        "plugin": "@parcel/transformer-html",
+        "config": {
+          "optimize": {
+            "minifySvg": false
+          }
+        }
+      }
+    ]
+  }
+}

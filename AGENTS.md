@@ -1,0 +1,51 @@
+# AGENTS.md
+
+Guidance for AI coding agents working in this repository.
+
+## Project
+
+TaxiRouter SG is a web app for exploring available taxis and taxi stands in Singapore. It is vanilla JavaScript with no UI framework.
+
+## Stack
+
+- Parcel 3 alpha (`parcel@~3.0.0-0`) for bundling and the dev server
+- mapbox-gl v3 for the map
+- Turf v7 for geospatial helpers
+- A mix of ES modules and CommonJS in `src/`
+
+## Requirements
+
+- Node.js 18+ (developed on Node 24). Parcel 3 itself is a standalone Rust binary, but the npm scripts still need Node.
+- npm; `package-lock.json` is committed.
+
+## Commands
+
+- `npm install` — install dependencies
+- `npm start` — dev server at http://localhost:1234 (runs with `--no-hmr`)
+- `npm run start-https` — dev server with HTTPS
+- `npm run build` — production build into `dist/`; `postbuild` copies `public/*` into `dist`
+- `npm run taxi-stands` — fetch the latest LTA Taxi Stop GeoJSON from data.gov.sg and regenerate `data/taxi-stands.json`
+
+## Layout
+
+- `src/index.html` — Parcel entry point
+- `src/app.js` — main app: map setup, layers, geolocation, service worker registration
+- `src/app.css` — styles (imports mapbox-gl CSS)
+- `src/sw.js` — service worker (Workbox loaded from CDN)
+- `data/taxi-stands.json` — array of `[lng, lat]` pairs consumed by the app
+- `scripts/fetch-taxi-stands.js` — fetches taxi stands from the data.gov.sg API
+- `public/` — static files copied into `dist` at build time (CNAME, favicon)
+- `.parcelrc` — Parcel config: disables SVG minification and splits `node_modules` into a vendor bundle
+
+## Conventions and gotchas
+
+- Import JSON with ESM (`import data from './data.json'`). Parcel 3's `require()` of JSON returns a module namespace (`{ default: ... }`), which silently breaks data passed to Turf.
+- Turf packages are CommonJS; `require('@turf/foo').default` is the expected pattern.
+- Parcel 3 removed `--no-cache`, `--no-autoinstall`, and on-disk caching. Do not reintroduce them.
+- `.htmlnanorc` is no longer supported; HTML transformer options live in `.parcelrc`.
+- The `~1.9 MB` build warning is almost entirely mapbox-gl. It is expected; serve assets with gzip/brotli. `manualSharedBundles` keeps the app chunk small so mapbox stays cached separately.
+- There is no test suite or linter configured. Verify changes with `npm run build` and by loading the app in a browser.
+
+## Deployment
+
+GitHub Actions (`.github/workflows/main.yml`) runs `npm ci && npm run build` on pushes to `master` and deploys `dist` to the `gh-pages` branch.
