@@ -1,4 +1,5 @@
 import taxiStandsOnMap from '../data/taxi-stands.json';
+import * as ThreeDTaxi from './3d-taxi.js';
 
 const mapboxgl = require('mapbox-gl');
 
@@ -167,16 +168,6 @@ class PitchControl {
 }
 map.addControl(new PitchControl(), 'top-right');
 
-let ThreeDTaxi;
-// if (true) {
-//   import('./3d-taxi.js').then((layer) => {
-//     ThreeDTaxi = layer;
-//     map.once('idle', () => {
-//       ThreeDTaxi.render(map);
-//     });
-//   });
-// }
-
 map.once('styledata', () => {
   const layers = map.getStyle().layers;
   // console.log(layers);
@@ -225,40 +216,38 @@ map.once('load', function () {
   // );
 
   map.addSource('taxis', emptyGeojson);
-  if (!ThreeDTaxi) {
-    map.addLayer({
-      id: 'taxis',
-      type: 'symbol',
-      source: 'taxis',
-      minzoom: 10,
-      filter: [
+  map.addLayer({
+    id: 'taxis',
+    type: 'symbol',
+    source: 'taxis',
+    minzoom: 10,
+    filter: [
+      'case',
+      ['<', ['pitch'], 65],
+      true,
+      ['all', ['>=', ['pitch'], 65], ['<', ['distance-from-center'], 3]],
+      true,
+      false,
+    ],
+    layout: {
+      'icon-padding': 1,
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.1, 18, 1],
+      'icon-ignore-placement': true,
+      'icon-allow-overlap': true,
+      'icon-image': [
         'case',
-        ['<', ['pitch'], 65],
-        true,
-        ['all', ['>=', ['pitch'], 65], ['<', ['distance-from-center'], 3]],
-        true,
-        false,
+        ['to-boolean', ['get', 'stationary']],
+        'taxi-stationary',
+        'taxi',
       ],
-      layout: {
-        'icon-padding': 1,
-        'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.1, 18, 1],
-        'icon-ignore-placement': true,
-        'icon-allow-overlap': true,
-        'icon-image': [
-          'case',
-          ['to-boolean', ['get', 'stationary']],
-          'taxi-stationary',
-          'taxi',
-        ],
-        'symbol-sort-key': [
-          'case',
-          ['to-boolean', ['get', 'stationary']],
-          1,
-          2,
-        ],
-      },
-    });
-  }
+      'symbol-sort-key': [
+        'case',
+        ['to-boolean', ['get', 'stationary']],
+        1,
+        2,
+      ],
+    },
+  });
   map.addLayer({
     id: 'taxis-heat',
     type: 'heatmap',
@@ -304,6 +293,8 @@ map.once('load', function () {
     map.addImage('taxi-stationary', $('img-taxi-stationary'));
     map.addImage('taxi-stand', $('img-taxi-stand'));
   }, 300);
+
+  ThreeDTaxi.render(map);
 
   let sticking = false;
   let watching = false;
@@ -351,10 +342,10 @@ map.once('load', function () {
     requestAnimationFrame(function () {
       $infoTaxis.className = '';
       fetchTaxis(function (data) {
+        const stationaryTaxis = [];
         if (taxisOnMap) {
           const taxisOnMapStr =
             taxisOnMap.features[0].geometry.coordinates.toString();
-          const stationaryTaxis = [];
           const movingTaxis = [];
           const { coordinates } = data.features[0].geometry;
           for (let i = 0, l = coordinates.length; i < l; i++) {
@@ -376,9 +367,7 @@ map.once('load', function () {
         }
         taxisOnMap = data;
         renderTaxisInfo();
-        // requestAnimationFrame(() => {
-        //   ThreeDTaxi?.setData(map, data);
-        // });
+        ThreeDTaxi.setData(map, data, stationaryTaxis);
       });
 
       setTimeout(renderTaxis, 1000 * 60); // every minute
